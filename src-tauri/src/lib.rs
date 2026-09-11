@@ -125,6 +125,9 @@ pub fn run() {
             commands::integration_disconnect,
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             let handle = app.handle().clone();
             let ledge = Ledge::load(&handle);
 
