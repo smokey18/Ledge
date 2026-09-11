@@ -51,19 +51,19 @@ function elapsed(since: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-function headlineFor(lead: State, group: SessionEvent[]): string {
-  if (!sessions.length) return "No sessions";
-  const only = group.length === 1 ? group[0].project_name : "";
+function headlineFor(session?: SessionEvent): string {
+  if (!session) return "No sessions";
+  const agent = labels[session.agent] ?? session.agent;
 
-  switch (lead) {
+  switch (session.state) {
     case "waiting":
-      return only ? `${only} needs you` : `${group.length} need you`;
+      return `${agent} needs you`;
     case "working":
-      return only ? `${only} · working` : `${group.length} working`;
+      return `${agent} · working`;
     case "failed":
-      return only ? `${only} · failed` : `${group.length} failed`;
+      return `${agent} · failed`;
     case "completed":
-      return only ? `${only} · finished` : `${group.length} finished`;
+      return `${agent} · finished`;
     default:
       return "Nothing running";
   }
@@ -137,7 +137,7 @@ function render() {
   const lead = latest?.state ?? "idle";
 
   dot.className = `dot ${lead}`;
-  headline.textContent = headlineFor(lead, latest ? [latest] : []);
+  headline.textContent = headlineFor(latest);
 
   track.classList.toggle("active", working.length > 0);
 
