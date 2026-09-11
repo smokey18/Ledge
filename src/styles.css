@@ -1,0 +1,388 @@
+:root {
+  color-scheme: light dark;
+
+  --surface: rgba(252, 252, 253, 0.72);
+  --edge: rgba(0, 0, 0, 0.1);
+  --edge-light: rgba(255, 255, 255, 0.7);
+  --ink: #14141a;
+  --ink-dim: #6c6c78;
+  --ink-faint: #97979f;
+  --hover: rgba(0, 0, 0, 0.05);
+  --rule: rgba(0, 0, 0, 0.07);
+  --sunken: rgba(0, 0, 0, 0.04);
+
+  --brand: #4a92e8;
+  --pending: #d7820a;
+  --completed: #1c9c4d;
+  --failed: #d92d20;
+  --idle: #9b9ba4;
+
+  --surface-solid: #fbfbfc;
+  --halo: rgba(0, 0, 0, 0.03);
+  --radius: 13px;
+  --gutter: 12px;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: rgba(28, 28, 32, 0.72);
+    --edge: rgba(0, 0, 0, 0.5);
+    --edge-light: rgba(255, 255, 255, 0.12);
+    --ink: #f2f2f5;
+    --ink-dim: #a0a0ab;
+    --ink-faint: #75757f;
+    --hover: rgba(255, 255, 255, 0.07);
+    --rule: rgba(255, 255, 255, 0.08);
+    --sunken: rgba(0, 0, 0, 0.28);
+
+    --brand: #7db7ff;
+    --surface-solid: #1f1f24;
+    --halo: rgba(255, 255, 255, 0.04);
+    --pending: #f5a524;
+    --completed: #3ecf74;
+    --failed: #ff5d52;
+    --idle: #6e6e78;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  color: var(--ink);
+  font: 13px/1.45 system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  height: 44px;
+  padding: 0 7px 0 var(--gutter);
+}
+
+.headline {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 530;
+  letter-spacing: -0.006em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+
+button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+button:active {
+  transform: scale(0.94);
+  transition-duration: 60ms;
+}
+
+button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.knob {
+  fill: currentColor;
+  stroke: none;
+}
+
+#expand svg {
+  transition: transform 220ms var(--ease);
+}
+
+body.expanded #expand svg {
+  transform: rotate(180deg);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--idle);
+  box-shadow: 0 0 0 2.5px var(--halo);
+}
+
+.dot.working {
+  background: var(--pending);
+}
+
+.dot.waiting {
+  background: var(--pending);
+  animation: breathe 1.6s var(--ease) infinite;
+}
+
+.dot.completed {
+  background: var(--completed);
+}
+
+.dot.failed {
+  background: var(--failed);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(245, 165, 36, 0.45);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 3.5px rgba(245, 165, 36, 0);
+  }
+}
+
+.track {
+  height: 1.5px;
+  flex: none;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.track > span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--pending);
+  opacity: 0;
+}
+
+.track.active > span {
+  opacity: 1;
+  animation: sweep 1.5s var(--ease) infinite;
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.panel {
+  flex: 1;
+  padding-bottom: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body:not(.expanded) .panel {
+  display: none;
+}
+
+.group summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 6px;
+  padding: 8px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.group + .group {
+  border-top: 0.5px solid var(--rule);
+  margin-top: 5px;
+  padding-top: 5px;
+}
+
+.group:first-child {
+  margin-top: 4px;
+}
+
+.group[open] {
+  padding-bottom: 4px;
+}
+
+.group summary::-webkit-details-marker {
+  display: none;
+}
+
+.group summary:hover {
+  background: var(--hover);
+}
+
+.chevron {
+  margin-left: 2px;
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1;
+  transition: transform 200ms var(--ease);
+}
+
+.group[open] .chevron {
+  transform: rotate(90deg);
+}
+
+.agent-name {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 590;
+  letter-spacing: -0.008em;
+}
+
+.tally {
+  min-width: 17px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--rule);
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.session {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 6px;
+  padding: 6px 7px 6px 21px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 120ms var(--ease);
+}
+
+.session:hover {
+  background: var(--hover);
+}
+
+.session:active {
+  background: var(--rule);
+}
+
+.session .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.project {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  letter-spacing: -0.006em;
+}
+
+.state {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.008em;
+  color: var(--ink-faint);
+}
+
+.state.working,
+.state.waiting {
+  color: var(--pending);
+}
+
+.state.completed {
+  color: var(--completed);
+}
+
+.state.failed {
+  color: var(--failed);
+}
+
+.elapsed {
+  flex: none;
+  align-self: flex-start;
+  padding-top: 1px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.empty {
+  padding: 26px var(--gutter);
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 60ms !important;
+  }
+
+  .dot.waiting {
+    box-shadow: 0 0 0 3px rgba(245, 165, 36, 0.3);
+  }
+
+  .track.active > span {
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-contrast: more) {
+  main {
+    background: Canvas;
+  }
+
+  .state,
+  .elapsed,
+  .tally {
+    color: var(--ink);
+  }
+}
+
+
+
+/* WebKit reserves layout width for a scrollbar, which shifts the text. The
+   list is short and the trackpad scrolls it fine. */
+.panel::-webkit-scrollbar {
+  display: none;
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ledge</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main data-tauri-drag-region>
+      <header data-tauri-drag-region>
+        <span class="dot" id="dot"></span>
+        <span class="headline" id="headline" data-tauri-drag-region>No sessions</span>
+        <button id="settings" aria-label="Settings">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2 5.5h12M2 10.5h12" />
+            <circle cx="10.5" cy="5.5" r="2.15" class="knob" />
+            <circle cx="5.5" cy="10.5" r="2.15" class="knob" />
+          </svg>
+        </button>
+        <button id="expand" aria-label="Expand" aria-expanded="false">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 6.75L8 10.25l3.5-3.5" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="track" id="track"><span></span></div>
+
+      <section class="panel" id="sessions"></section>
+
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

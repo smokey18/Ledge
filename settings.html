@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ledge Settings</title>
+    <link rel="stylesheet" href="/src/settings.css" />
+  </head>
+  <body>
+    <header data-tauri-drag-region><h1 data-tauri-drag-region>Settings</h1></header>
+
+    <main>
+      <section>
+        <h2>General</h2>
+        <div class="card">
+          <label class="row">
+            <span class="label">
+              Open at login
+              <small>Start Ledge automatically when you sign in.</small>
+            </span>
+            <input type="checkbox" id="autostart" class="switch" />
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Agents</h2>
+        <div id="agents"></div>
+      </section>
+    </main>
+  </body>
+  <script type="module" src="/src/settings.ts"></script>
+</html>

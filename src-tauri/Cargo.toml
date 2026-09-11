@@ -1,0 +1,33 @@
+[package]
+name = "ledge"
+version = "0.1.0"
+description = "Your agents, at a glance."
+authors = ["you"]
+edition = "2021"
+default-run = "ledge"
+
+[lib]
+name = "ledge_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "ledge-hook"
+path = "src/bin/hook.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml_edit = "0.22"
+tauri-plugin-autostart = "2.5.1"
+window-vibrancy = "0.8.0"
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
