@@ -27,20 +27,16 @@ fn codex_config() -> PathBuf {
 }
 
 fn backup(path: &Path) -> io::Result<()> {
-    if !path.exists() {
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Ok(());
+    };
+    if raw.contains(MARKER) {
         return Ok(());
     }
 
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .unwrap_or_default();
-
     let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(format!(".ledge-backup.{stamp}"));
-    std::fs::copy(path, path.with_file_name(name))?;
-
-    Ok(())
+    name.push(".ledge-backup");
+    std::fs::write(path.with_file_name(name), raw)
 }
 
 fn read_json(path: &Path) -> Value {
@@ -174,9 +170,6 @@ pub fn remove_legacy_codex() {
     }
 }
 
-// Codex's `notify` is a single command slot rather than a list, so taking it
-// over means carrying the displaced command along.
-
 #[derive(Serialize)]
 pub struct NotifyStatus {
     pub current: Option<Vec<String>>,
@@ -214,26 +207,6 @@ pub fn notify_status() -> NotifyStatus {
         .is_some_and(|args| args.first().is_some_and(|arg| arg.contains(MARKER)));
 
     NotifyStatus { current, is_ours }
-}
-
-pub fn notify_connect(binary: &str) -> io::Result<()> {
-    let status = notify_status();
-    if status.is_ours {
-        return Ok(());
-    }
-
-    let path = codex_config();
-    backup(&path)?;
-    let mut document = read_toml(&path)?;
-
-    let mut args = vec![binary.to_string(), "codex-notify".into()];
-    if let Some(displaced) = status.current.filter(|args| !args.is_empty()) {
-        args.push("--".into());
-        args.extend(displaced);
-    }
-    document["notify"] = notify_array(args);
-
-    std::fs::write(&path, document.to_string())
 }
 
 pub fn notify_disconnect() -> io::Result<()> {
@@ -310,6 +283,25 @@ mod tests {
     }
 
     #[test]
+    fn the_backup_is_one_file_and_only_ever_holds_the_pristine_config() {
+        let path = std::env::temp_dir().join(format!("ledge-backup-{}.json", std::process::id()));
+        let copy = PathBuf::from(format!("{}.ledge-backup", path.display()));
+        let _ = std::fs::remove_file(&copy);
+
+        std::fs::write(&path, "{\"model\":\"opus\"}").unwrap();
+        backup(&path).unwrap();
+        assert_eq!(std::fs::read_to_string(&copy).unwrap(), "{\"model\":\"opus\"}");
+
+        std::fs::write(&path, format!("{{\"hook\":\"{MARKER}\"}}")).unwrap();
+        backup(&path).unwrap();
+        assert_eq!(std::fs::read_to_string(&copy).unwrap(), "{\"model\":\"opus\"}");
+
+        for file in [path, copy] {
+            let _ = std::fs::remove_file(file);
+        }
+    }
+
+    #[test]
     fn a_real_config_survives_connect_and_disconnect_unchanged() {
         let Some(real_home) = std::env::var_os("HOME").map(PathBuf::from) else {
             return;
@@ -342,18 +334,11 @@ mod tests {
 
         connect("claude", BINARY).unwrap();
         connect("codex", BINARY).unwrap();
-        notify_connect(BINARY).unwrap();
 
         assert!(std::fs::read_to_string(&claude_copy)
             .unwrap()
             .contains(MARKER));
         assert!(scratch.join(".codex/hooks.json").exists());
-
-        let during_codex = std::fs::read_to_string(&codex_copy).unwrap();
-        assert!(during_codex.contains(MARKER));
-        if before_codex.contains("notify = [") {
-            assert!(during_codex.contains("\"--\""), "displaced command dropped");
-        }
 
         disconnect("claude").unwrap();
         disconnect("codex").unwrap();

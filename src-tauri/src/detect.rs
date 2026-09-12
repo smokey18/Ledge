@@ -5,7 +5,6 @@ pub struct Agent {
     pub label: &'static str,
     pub executable: &'static str,
     pub data_dir: &'static str,
-    pub uses_notify: bool,
 }
 
 pub const AGENTS: &[Agent] = &[
@@ -14,14 +13,12 @@ pub const AGENTS: &[Agent] = &[
         label: "Claude Code",
         executable: "claude",
         data_dir: ".claude",
-        uses_notify: false,
     },
     Agent {
         id: "codex",
         label: "Codex",
         executable: "codex",
         data_dir: ".codex",
-        uses_notify: true,
     },
 ];
 
@@ -55,9 +52,6 @@ pub fn is_available(agent: &str) -> bool {
     })
 }
 
-pub fn uses_notify(agent: &str) -> bool {
-    find(agent).is_some_and(|agent| agent.uses_notify)
-}
 
 #[cfg(test)]
 mod tests {

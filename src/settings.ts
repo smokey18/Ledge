@@ -4,8 +4,6 @@ interface Integration {
   agent: string;
   label: string;
   available: boolean;
-  connected: boolean;
-  automatic: boolean;
 }
 
 interface Prefs {
@@ -35,34 +33,11 @@ function card(integration: Integration): HTMLElement {
   head.querySelector(".agent-name")!.textContent = integration.label;
 
   const status = head.querySelector(".status") as HTMLElement;
-  status.textContent = !integration.available
-    ? "Not installed"
-    : integration.automatic
-      ? "Automatic"
-      : integration.connected
-        ? "Connected"
-        : "Not connected";
-  status.classList.toggle("on", integration.connected);
+  status.textContent = integration.available ? "Connected" : "Not installed";
+  status.classList.toggle("on", integration.available);
 
   body.append(head);
   element.append(mark, body);
-
-  if (!integration.available) return element;
-  if (integration.automatic) return element;
-
-  const connect = document.createElement("button");
-  connect.textContent = integration.connected ? "Disconnect" : "Connect";
-  connect.className = integration.connected ? "destructive" : "primary";
-  connect.onclick = async () => {
-    connect.disabled = true;
-    await invoke(
-      integration.connected ? "integration_disconnect" : "integration_connect",
-      { agent: integration.agent },
-    );
-    render();
-  };
-
-  body.append(connect);
 
   return element;
 }

@@ -1,5 +1,5 @@
 use crate::state::{Ledge, SessionEvent};
-use crate::{detect, ipc, setup, window};
+use crate::{detect, window};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -14,8 +14,6 @@ pub struct Integration {
     agent: &'static str,
     label: &'static str,
     available: bool,
-    connected: bool,
-    automatic: bool,
 }
 
 #[derive(Serialize)]
@@ -119,48 +117,10 @@ pub fn open_settings(app: AppHandle) -> Command<()> {
 pub fn integrations() -> Vec<Integration> {
     detect::AGENTS
         .iter()
-        .map(|agent| {
-            let available = detect::is_available(agent.id);
-            Integration {
-                agent: agent.id,
-                label: agent.label,
-                available,
-                connected: (agent.id == "codex" && available) || setup::is_connected(agent.id),
-                automatic: agent.id == "codex",
-            }
+        .map(|agent| Integration {
+            agent: agent.id,
+            label: agent.label,
+            available: detect::is_available(agent.id),
         })
         .collect()
-}
-
-#[tauri::command]
-pub fn integration_connect(app: AppHandle, agent: String) -> Command<()> {
-    if agent == "codex" {
-        return Ok(());
-    }
-    let binary = hook_binary(&app)?;
-    setup::connect(&agent, &binary).map_err(|e| e.to_string())?;
-
-    if detect::uses_notify(&agent) {
-        setup::notify_connect(&binary).map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn integration_disconnect(agent: String) -> Command<()> {
-    if agent == "codex" {
-        return Ok(());
-    }
-    setup::disconnect(&agent).map_err(|e| e.to_string())?;
-
-    if detect::uses_notify(&agent) {
-        setup::notify_disconnect().map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-fn hook_binary(app: &AppHandle) -> Command<String> {
-    ipc::hook_binary_path(app).ok_or_else(|| "the ledge-hook binary is missing".into())
 }

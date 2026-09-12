@@ -76,6 +76,19 @@ fn ensure_sweeper(app: &AppHandle) {
     });
 }
 
+fn sync_claude_hook(app: &AppHandle) {
+    if !detect::is_available("claude") {
+        return;
+    }
+    let Some(binary) = ipc::hook_binary_path(app) else {
+        eprintln!("ledge: the ledge-hook binary is missing");
+        return;
+    };
+    if let Err(error) = setup::connect("claude", &binary) {
+        eprintln!("ledge: could not connect Claude Code: {error}");
+    }
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let toggle = MenuItem::with_id(app, "toggle", "Hide Ledge", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Ledge", true, None::<&str>)?;
@@ -94,6 +107,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "toggle" => window::toggle_visibility(app),
             "quit" => {
                 app.state::<Ledge>().save(app);
+                let _ = setup::disconnect("claude");
                 ipc::cleanup();
                 app.exit(0);
             }
@@ -121,8 +135,6 @@ pub fn run() {
             commands::agent_labels,
             commands::open_settings,
             commands::integrations,
-            commands::integration_connect,
-            commands::integration_disconnect,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -151,6 +163,7 @@ pub fn run() {
                 eprintln!("ledge: could not open the hook endpoint: {error}");
             }
             setup::remove_legacy_codex();
+            sync_claude_hook(&handle);
             codex::start(handle.clone());
             build_tray(&handle)?;
             window::sync_tray_label(&handle);

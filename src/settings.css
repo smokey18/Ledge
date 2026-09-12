@@ -8,11 +8,9 @@
   --rule: rgba(0, 0, 0, 0.08);
   --edge: rgba(0, 0, 0, 0.1);
   --control: rgba(0, 0, 0, 0.06);
-  --control-hover: rgba(0, 0, 0, 0.1);
   --brand: #2f7fd4;
   --ok: #1c9c4d;
   --ok-soft: rgba(28, 156, 77, 0.1);
-  --danger: #d92d20;
 
   --scrollbar: rgba(0, 0, 0, 0.22);
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -27,11 +25,9 @@
     --rule: rgba(255, 255, 255, 0.08);
     --edge: rgba(255, 255, 255, 0.09);
     --control: rgba(255, 255, 255, 0.1);
-    --control-hover: rgba(255, 255, 255, 0.16);
     --brand: #7db7ff;
     --ok: #3ecf74;
     --ok-soft: rgba(62, 207, 116, 0.1);
-    --danger: #ff5d52;
     --scrollbar: rgba(255, 255, 255, 0.2);
   }
 }
@@ -229,46 +225,6 @@ h2 {
 .status.on {
   background: var(--ok-soft);
   color: var(--ok);
-}
-
-.agent-body > button {
-  margin-top: 11px;
-}
-
-button {
-  height: 26px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--control);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: -0.004em;
-  cursor: pointer;
-  transition: background 140ms var(--ease), transform 90ms var(--ease);
-}
-
-button:hover {
-  background: var(--control-hover);
-}
-
-button:active {
-  transform: scale(0.97);
-}
-
-button.primary {
-  background: var(--brand);
-  color: #fff;
-}
-
-button.primary:hover {
-  filter: brightness(1.08);
-}
-
-button.destructive:hover {
-  color: var(--danger);
 }
 
 @media (prefers-reduced-motion: reduce) {
