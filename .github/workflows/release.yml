@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -31,3 +33,14 @@ jobs:
           releaseBody: See the assets below to download and install.
           releaseDraft: true
           args: --target aarch64-apple-darwin
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd src-tauri/target/aarch64-apple-darwin/release/bundle/dmg
+          shasum -a 256 *.dmg > SHA256SUMS.txt
+          gh release upload "${{ github.ref_name }}" SHA256SUMS.txt --clobber

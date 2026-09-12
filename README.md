@@ -1,38 +1,44 @@
 # Ledge
 
-See what your local coding agents are doing without switching windows.
+See what your coding agents are doing without switching windows.
 
-Ledge is an always-on-top macOS widget that shows each agent session's project,
-elapsed time, and current state. Click a session to open its project in Finder.
+Ledge is a small always-on-top widget for macOS. It shows which project each
+agent is on, how long it has been going, and whether it is busy, waiting on you,
+or done. Click a session to open that project in Finder.
+
+Works with Claude Code and Codex.
 
 ## Install
 
-[Download the latest release](../../releases/latest), open the `.dmg`, and drag
-Ledge into Applications. Requires macOS 11 or newer.
+```sh
+curl -fsSL https://raw.githubusercontent.com/smokey18/Ledge/main/scripts/install.sh | sh
+```
 
-Ledge is not notarized yet, so the first launch requires right-clicking the app
-and choosing **Open**.
+macOS 11 or newer. No setup — start an agent as usual and it shows up.
 
-## Agent setup
+<details>
+<summary>Other ways to install</summary>
 
-| Agent | Setup |
-| --- | --- |
-| Claude Code | Open Ledge Settings and click **Connect** once. |
-| Codex | None. Sessions are detected automatically. |
+Grab the `.dmg` from the [latest release](../../releases/latest) and drag Ledge
+into Applications. The first launch needs **System Settings → Privacy &
+Security → Open Anyway**.
 
-**Open at login** is optional.
+Or build it: `npm install && npm run tauri build`.
 
-## How it works
+To check a download is genuine:
 
-Agent activity is detected locally through session logs or a bundled integration.
+```sh
+gh attestation verify Ledge_*.dmg --repo smokey18/Ledge
+```
 
-Only session IDs, event state, timestamps, and project paths are retained. Chat
-content is not stored, and nothing leaves your Mac.
+</details>
 
-## Limits
+## Notes
 
-- Remote or cloud-only agent runs are not shown.
-- Sessions that require an integration must start after it is connected.
+- **Open at login** lives in Settings.
+- Cloud or remote agent runs don't appear.
+- Start Ledge before your agent.
+- Everything stays on your Mac.
 
 ## Development
 
@@ -44,6 +50,3 @@ npm run tauri dev
 npm run tauri build
 cd src-tauri && cargo test
 ```
-
-Development uses a debug integration build. Production builds use an optimized
-build and produce the macOS app and DMG.
