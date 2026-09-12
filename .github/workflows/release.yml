@@ -35,6 +35,7 @@ jobs:
           args: --target aarch64-apple-darwin
 
       - uses: actions/attest-build-provenance@v4
+        if: ${{ !github.event.repository.private }}
         with:
           subject-path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
 
