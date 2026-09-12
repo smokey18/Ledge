@@ -1,194 +1,98 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-
-type State = "working" | "waiting" | "completed" | "failed" | "idle";
-
-interface SessionEvent {
-  session_id: string;
-  agent: string;
-  project_name: string;
-  cwd: string;
-  state: State;
-  started_at: number;
-  updated_at: number;
-}
-
-
-
+import { mark } from "./marks";
+import { byAgent, SessionEvent, STATE_TEXT, worstOf } from "./session";
 
 const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const dot = el("dot");
-const headline = el("headline");
-const expandButton = el<HTMLButtonElement>("expand");
+const orb = el<HTMLButtonElement>("orb");
+const nodes = el("nodes");
 const settingsButton = el<HTMLButtonElement>("settings");
-const track = el("track");
-const sessionsPanel = el("sessions");
-
-const STATE_TEXT: Record<State, string> = {
-  working: "working",
-  waiting: "needs you",
-  completed: "finished",
-  failed: "failed",
-  idle: "idle",
-};
-
-const SEVERITY: State[] = ["waiting", "failed", "working", "completed", "idle"];
 
 const labels: Record<string, string> = {};
 
+const report = (error: unknown) => console.error("ledge rail:", error);
+
 let sessions: SessionEvent[] = [];
-let expanded = false;
-let clock: number | undefined;
-const collapsed = new Set<string>();
+let openAgent: string | null = null;
+let drawn = "";
 
-function elapsed(since: number): string {
-  const total = Math.max(0, Math.floor((Date.now() - since) / 1000));
-  if (total < 60) return `${total}s`;
-
-  const minutes = Math.floor(total / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+function label(agent: string) {
+  return labels[agent] ?? agent;
 }
 
-function headlineFor(session?: SessionEvent): string {
-  if (!session) return "No sessions";
-  const agent = labels[session.agent] ?? session.agent;
+function agentNode(agent: string, group: SessionEvent[]): HTMLElement {
+  const node = document.createElement("button");
+  node.className = `node ${worstOf(group)}`;
+  node.setAttribute("aria-label", `${label(agent)}, ${STATE_TEXT[worstOf(group)]}`);
+  node.append(mark(agent, label(agent)));
 
-  switch (session.state) {
-    case "waiting":
-      return `${agent} needs you`;
-    case "working":
-      return `${agent} · working`;
-    case "failed":
-      return `${agent} · failed`;
-    case "completed":
-      return `${agent} · finished`;
-    default:
-      return "Nothing running";
-  }
-}
-
-function sessionRow(session: SessionEvent): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "session";
-  row.title = session.cwd ? `Open ${session.project_name} in Finder` : "";
-  row.innerHTML = `
-    <span class="dot ${session.state}"></span>
-    <span class="body">
-      <div class="project"></div>
-      <div class="state ${session.state}"></div>
-    </span>
-    <span class="elapsed"></span>`;
-
-  row.querySelector(".project")!.textContent = session.project_name;
-  row.querySelector(".state")!.textContent = STATE_TEXT[session.state];
-  row.querySelector(".elapsed")!.textContent = elapsed(session.started_at);
-
-  if (session.cwd) {
-    row.onclick = () =>
-      invoke("open_project", { sessionId: session.session_id }).catch(() => {
-        row.title = "That directory is gone";
-      });
-  }
-  return row;
-}
-
-function agentGroup(agent: string, label: string, group: SessionEvent[]): HTMLElement {
-  const worst = SEVERITY.find((state) => group.some((s) => s.state === state)) ?? "idle";
-
-  const details = document.createElement("details");
-  details.className = "group";
-  details.open = !collapsed.has(agent);
-  details.ontoggle = () => (details.open ? collapsed.delete(agent) : collapsed.add(agent));
-
-  const summary = document.createElement("summary");
-  summary.innerHTML = `
-    <span class="dot ${worst}"></span>
-    <span class="agent-name"></span>
-    <span class="tally"></span>
-    <span class="chevron">›</span>`;
-  summary.querySelector(".agent-name")!.textContent = label;
-  summary.querySelector(".tally")!.textContent = `${group.length}`;
-
-  details.append(summary, ...group.map(sessionRow));
-  return details;
-}
-
-function renderSessions() {
-  if (!sessions.length) {
-    sessionsPanel.innerHTML = `<p class="empty">Nothing running</p>`;
-    return;
+  if (group.length > 1) {
+    const tally = document.createElement("span");
+    tally.className = "tally";
+    tally.textContent = `${group.length}`;
+    node.append(tally);
   }
 
-  const byAgent = new Map<string, SessionEvent[]>();
-  for (const session of sessions) {
-    byAgent.set(session.agent, [...(byAgent.get(session.agent) ?? []), session]);
-  }
-
-  sessionsPanel.replaceChildren(
-    ...[...byAgent].map(([agent, group]) => agentGroup(agent, labels[agent] ?? agent, group)),
-  );
+  node.onclick = () => {
+    openAgent = agent;
+    invoke("open_popover", { agent, anchor: node.offsetTop + node.offsetHeight / 2 }).catch(
+      (error) => {
+        openAgent = null;
+        report(error);
+      },
+    );
+  };
+  return node;
 }
 
-function render() {
-  const working = sessions.filter((session) => session.state === "working");
-  const latest = sessions[0];
-  const lead = latest?.state ?? "idle";
-
-  dot.className = `dot ${lead}`;
-  headline.textContent = headlineFor(latest);
-
-  track.classList.toggle("active", working.length > 0);
-
-  if (expanded) renderSessions();
-  syncClock(working.length > 0);
+function closePopover() {
+  openAgent = null;
+  invoke("close_popover").catch(report);
 }
 
-/** The clock exists only while work is live, so a static widget never repaints. */
-function syncClock(working: boolean) {
-  const wanted = working && expanded;
-
-  if (wanted && clock === undefined) {
-    clock = window.setInterval(renderSessions, 1000);
-  } else if (!wanted && clock !== undefined) {
-    clearInterval(clock);
-    clock = undefined;
-  }
+function signature(list: SessionEvent[]) {
+  return list.map((s) => `${s.agent}:${s.session_id}:${s.state}`).join("|");
 }
 
+function render(force = false) {
+  const stamp = signature(sessions);
+  if (!force && stamp === drawn) return;
+  drawn = stamp;
 
+  const groups = [...byAgent(sessions)];
 
+  orb.className = `orb ${worstOf(sessions)}`;
+  orb.title = sessions.length
+    ? `${sessions.length} session${sessions.length === 1 ? "" : "s"}`
+    : "No sessions";
 
+  nodes.replaceChildren(...groups.map(([agent, group]) => agentNode(agent, group)));
 
-function setExpanded(next: boolean) {
-  expanded = next;
-  document.body.classList.toggle("expanded", expanded);
-  expandButton.setAttribute("aria-expanded", `${expanded}`);
-  expandButton.setAttribute("aria-label", expanded ? "Collapse" : "Expand");
-  render();
-  // Resizing the window is Rust's job, but drawing must not wait on it.
-  invoke("set_expanded", { expanded }).catch(() => {});
+  invoke("set_agent_count", { count: groups.length }).catch(report);
+
+  if (openAgent && !groups.some(([agent]) => agent === openAgent)) closePopover();
 }
 
-expandButton.addEventListener("click", () => setExpanded(!expanded));
+orb.addEventListener("click", () => (openAgent ? closePopover() : undefined));
 
-// The window grows after the list is drawn, and a transparent WebView does not
-// reliably repaint the area that reveals.
-window.addEventListener("resize", () => {
-  if (expanded) renderSessions();
+settingsButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  invoke("open_settings");
 });
-
-settingsButton.addEventListener("click", () => invoke("open_settings"));
-
-
-
 
 listen<SessionEvent[]>("sessions", (event) => {
   sessions = event.payload;
   render();
 });
 
+setInterval(async () => {
+  sessions = await invoke<SessionEvent[]>("get_sessions");
+  render();
+}, 2000);
+
+listen("popover-closed", () => (openAgent = null));
+
 sessions = await invoke<SessionEvent[]>("get_sessions");
 Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
-setExpanded((await invoke<{ expanded: boolean }>("get_prefs")).expanded);
+render(true);

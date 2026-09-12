@@ -129,7 +129,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_sessions,
             commands::get_prefs,
-            commands::set_expanded,
+            commands::set_agent_count,
+            commands::open_popover,
+            commands::close_popover,
+            commands::size_popover,
             commands::set_autostart,
             commands::open_project,
             commands::agent_labels,
@@ -143,19 +146,16 @@ pub fn run() {
             let handle = app.handle().clone();
             let ledge = Ledge::load(&handle);
 
-            let (positions, last_display, expanded) = {
+            let (positions, last_display) = {
                 let settings = ledge.settings.lock().unwrap();
-                (
-                    settings.positions.clone(),
-                    settings.last_display.clone(),
-                    settings.expanded,
-                )
+                (settings.positions.clone(), settings.last_display.clone())
             };
             app.manage(ledge);
+            app.manage(commands::PopoverState::default());
 
             if let Some(main) = app.get_webview_window("main") {
-                window::apply_material(&main);
-                let _ = main.set_size(window::size_for(expanded));
+                window::apply_material(&main, 39.0);
+                let _ = main.set_size(window::rail_size(1));
                 window::restore(&main, &positions, last_display.as_deref());
             }
 
@@ -176,6 +176,9 @@ pub fn run() {
             WindowEvent::Moved(_) => {
                 window::recenter_if_stranded(window);
                 window::remember_position(window);
+                if window.label() == "main" {
+                    commands::close_popover(window.app_handle().clone());
+                }
             }
             WindowEvent::ScaleFactorChanged { .. } => window::recenter_if_stranded(window),
             WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {

@@ -1,0 +1,105 @@
+:root {
+  color-scheme: light dark;
+
+  --glass: rgba(250, 250, 252, 0.4);
+  --rim: rgba(255, 255, 255, 0.58);
+  --spec: rgba(255, 255, 255, 0.85);
+
+  --ink: #20242c;
+  --muted: #858c98;
+  --faint: #7d8691;
+  --hairline: rgba(110, 120, 133, 0.42);
+  --node-fill: rgba(255, 255, 255, 0.28);
+  --node-rim: #9da6b2;
+  --hover: rgba(78, 134, 238, 0.13);
+
+  --chip: rgba(32, 36, 44, 0.85);
+  --chip-ink: #fff;
+
+  --blue: #4e86ee;
+  --amber: #d69b3d;
+  --green: #55b778;
+  --red: #d96870;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass: rgba(20, 21, 26, 0.45);
+    --rim: rgba(255, 255, 255, 0.2);
+    --spec: rgba(255, 255, 255, 0.26);
+
+    --ink: #f1f3f5;
+    --muted: #a7adb6;
+    --faint: #8d949d;
+    --hairline: rgba(255, 255, 255, 0.2);
+    --node-fill: rgba(255, 255, 255, 0.06);
+    --node-rim: #5c6470;
+    --hover: rgba(120, 165, 255, 0.16);
+
+    --chip: rgba(255, 255, 255, 0.88);
+    --chip-ink: #15161a;
+
+    --blue: #6ea2ff;
+    --amber: #e0a955;
+    --green: #63c586;
+    --red: #e87b83;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  color: var(--ink);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.mark {
+  display: block;
+  width: 19px;
+  height: 19px;
+  margin: auto;
+  overflow: visible;
+}
+
+.mark.claude { fill: #d97757; }
+.mark.codex { fill: var(--ink); }
+
+.mark.initial {
+  display: grid;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  place-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

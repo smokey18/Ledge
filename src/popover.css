@@ -1,0 +1,92 @@
+@import "./tokens.css";
+
+.popover {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 16px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 0.5px var(--rim), inset 0 0.5px 0 var(--spec);
+}
+
+.pills {
+  display: flex;
+  align-items: center;
+  margin-bottom: 11px;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.pills button {
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--faint);
+  font-size: 10px;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.pills button b { font-weight: 600; }
+
+.pills button:hover,
+.pills button.selected {
+  background: var(--hover);
+  color: var(--blue);
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session {
+  display: grid;
+  align-items: center;
+  border-radius: 8px;
+  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.session > span:nth-child(2) { min-width: 0; }
+
+.session-ring {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--node-rim);
+  border-radius: 50%;
+  place-items: center;
+}
+
+.session-ring .mark { width: 15px; height: 15px; }
+.session-ring.working { border-color: var(--blue); }
+.session-ring.waiting { border-color: var(--amber); }
+.session-ring.completed { border-color: var(--green); }
+.session-ring.failed { border-color: var(--red); }
+
+.session .project {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session .state {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.session .elapsed {
+  margin-left: 14px;
+  color: var(--faint);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 6px 2px 2px;
+  color: var(--faint);
+  font-size: 11px;
+}

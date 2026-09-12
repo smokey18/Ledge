@@ -64,8 +64,6 @@ pub struct Settings {
     pub positions: HashMap<String, (f64, f64)>,
     #[serde(default)]
     pub last_display: Option<String>,
-    #[serde(default)]
-    pub expanded: bool,
     /// Hooks are fire-and-forget; without this a restart loses every session.
     #[serde(default)]
     pub sessions: Vec<SessionEvent>,

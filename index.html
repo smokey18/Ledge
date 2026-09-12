@@ -7,29 +7,19 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main data-tauri-drag-region>
-      <header data-tauri-drag-region>
-        <span class="dot" id="dot"></span>
-        <span class="headline" id="headline" data-tauri-drag-region>No sessions</span>
-        <button id="settings" aria-label="Settings">
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M2 5.5h12M2 10.5h12" />
-            <circle cx="10.5" cy="5.5" r="2.15" class="knob" />
-            <circle cx="5.5" cy="10.5" r="2.15" class="knob" />
-          </svg>
+    <div class="rail" data-tauri-drag-region>
+      <div class="rail-orb">
+        <button class="orb" id="orb" aria-label="Ledge status">
+          <span class="orb-halo"></span>
+          <span class="orb-arc"></span>
+          <span class="orb-core"></span>
         </button>
-        <button id="expand" aria-label="Expand" aria-expanded="false">
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M4.5 6.75L8 10.25l3.5-3.5" />
-          </svg>
-        </button>
-      </header>
+      </div>
 
-      <div class="track" id="track"><span></span></div>
+      <div class="nodes" id="nodes" data-tauri-drag-region></div>
 
-      <section class="panel" id="sessions"></section>
-
-    </main>
+      <button class="settings" id="settings" aria-label="Ledge settings"><span></span></button>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

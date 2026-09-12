@@ -9,31 +9,39 @@ use tauri::{
 
 pub struct TrayToggle(pub MenuItem<Wry>);
 
-pub const COMPACT: LogicalSize<f64> = LogicalSize::new(248.0, 48.0);
-pub const EXPANDED: LogicalSize<f64> = LogicalSize::new(248.0, 330.0);
+pub const RAIL_WIDTH: f64 = 76.0;
+
+pub const POPOVER_GAP: f64 = 9.0;
+
+pub const POPOVER_WIDTH: f64 = 268.0;
+
+pub fn popover_height(rows: usize) -> f64 {
+    let rows = rows.max(1) as f64;
+    26.0 + 29.0 + (28.0 * rows + 10.0 * (rows - 1.0))
+}
 
 /// Enough of the widget must stay on screen to be grabbable.
 const VISIBLE_MARGIN: f64 = 60.0;
 const MOVE_SETTLE: Duration = Duration::from_millis(600);
 
 /// Real NSVisualEffectView; CSS can only approximate it.
-pub fn apply_material(window: &WebviewWindow) {
+pub fn apply_material(window: &WebviewWindow, radius: f64) {
     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
 
     let _ = apply_vibrancy(
         window,
         NSVisualEffectMaterial::HudWindow,
         Some(NSVisualEffectState::Active),
-        Some(12.0),
+        Some(radius),
     );
 }
 
-pub fn size_for(expanded: bool) -> LogicalSize<f64> {
-    if expanded {
-        EXPANDED
-    } else {
-        COMPACT
-    }
+pub fn rail_size(agents: usize) -> LogicalSize<f64> {
+    const CHROME: f64 = 16.0 + 28.0 + 20.0 + 26.0 + 18.0 + 14.0;
+
+    let agents = agents.max(1) as f64;
+    let nodes = 38.0 * agents + 20.0 * (agents - 1.0);
+    LogicalSize::new(RAIL_WIDTH, CHROME + nodes)
 }
 
 /// Names are absent on some compositors, so geometry backs the key up.
