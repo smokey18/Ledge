@@ -2,8 +2,10 @@
 name = "ledge"
 version = "0.2.0"
 description = "Your agents, at a glance."
-authors = ["you"]
+authors = ["smokey18"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/smokey18/Ledge"
 default-run = "ledge"
 
 [lib]

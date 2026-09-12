@@ -50,3 +50,10 @@ npm run tauri dev
 npm run tauri build
 cd src-tauri && cargo test
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+The Claude and OpenAI marks used to identify agents are trademarks of their
+respective owners and are not covered by that licence.
