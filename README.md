@@ -1,20 +1,17 @@
 # Ledge
 
-See what your coding agents are doing without switching windows.
+A small Mac widget that shows when Claude Code and Codex are working, waiting
+for you, or finished. Works with local sessions only.
 
-Ledge is a small always-on-top widget for macOS. It shows which project each
-agent is on, how long it has been going, and whether it is busy, waiting on you,
-or done. Click a session to open that project in Finder.
+## Install
 
-Works with Claude Code and Codex.
+Requires a Mac with Apple silicon (M1 or newer) and macOS 11 or later.
 
 ## Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/smokey18/Ledge/main/scripts/install.sh | sh
 ```
-
-macOS 11 or newer. No setup — start an agent as usual and it shows up.
 
 <details>
 <summary>Other ways to install</summary>
@@ -33,12 +30,14 @@ gh attestation verify Ledge_*.dmg --repo smokey18/Ledge
 
 </details>
 
-## Notes
+Open Ledge from Applications before starting your agent.
 
-- **Open at login** lives in Settings.
-- Cloud or remote agent runs don't appear.
-- Start Ledge before your agent.
-- Everything stays on your Mac.
+## Use
+
+- Click an agent icon to see its sessions.
+- Click a session to open its project folder in Finder.
+- Turn on **Open at login** in Settings to start Ledge automatically.
+- Use the menu bar icon to hide, show or quit Ledge.
 
 ## Development
 
@@ -53,7 +52,4 @@ cd src-tauri && cargo test
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-The Claude and OpenAI marks used to identify agents are trademarks of their
-respective owners and are not covered by that licence.
+[MIT](LICENSE) - Claude and OpenAI marks belong to their respective owners.
