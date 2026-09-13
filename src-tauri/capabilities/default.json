@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Local widget, settings and session windows",
   "windows": [
-    "main"
+    "main",
+    "settings",
+    "popover-*"
   ],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging",
-    "opener:default"
+    "core:window:allow-start-dragging"
   ]
 }

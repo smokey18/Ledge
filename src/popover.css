@@ -2,6 +2,8 @@
 
 .popover {
   width: 100%;
+  max-height: 600px;
+  overflow-y: auto;
   padding: 13px 14px;
   border-radius: 16px;
   background: var(--glass);
@@ -40,6 +42,8 @@
 
 .session {
   display: grid;
+  width: 100%;
+  text-align: left;
   align-items: center;
   border-radius: 8px;
   gap: 10px;
@@ -62,6 +66,11 @@
 .session-ring.waiting { border-color: var(--amber); }
 .session-ring.completed { border-color: var(--green); }
 .session-ring.failed { border-color: var(--red); }
+
+.session .project,
+.session .state { display: block; }
+
+.session:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .session .project {
   overflow: hidden;

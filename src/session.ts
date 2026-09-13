@@ -30,7 +30,9 @@ export function worstOf(group: SessionEvent[]): State {
 export function byAgent(sessions: SessionEvent[]): Map<string, SessionEvent[]> {
   const groups = new Map<string, SessionEvent[]>();
   for (const session of sessions) {
-    groups.set(session.agent, [...(groups.get(session.agent) ?? []), session]);
+    const group = groups.get(session.agent);
+    if (group) group.push(session);
+    else groups.set(session.agent, [session]);
   }
   return groups;
 }

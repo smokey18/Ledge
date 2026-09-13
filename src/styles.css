@@ -68,11 +68,10 @@
 }
 
 .orb.working .orb-halo { opacity: 0.1; }
-.orb.working .orb-arc { animation: spin 2.7s linear infinite; opacity: 1; }
+.orb.working .orb-arc { opacity: 1; }
 .orb.working .orb-mark circle { fill: var(--blue); filter: drop-shadow(0 0 5px var(--blue)); }
 
 .orb.waiting .orb-halo {
-  animation: breathe 2.6s ease-in-out infinite;
   color: var(--amber);
   opacity: 0.18;
 }
@@ -132,7 +131,6 @@
 .node.idle { opacity: 0.42; }
 
 .node.waiting {
-  animation: nudge 2.8s ease-in-out infinite;
   border-color: var(--amber);
 }
 
@@ -179,15 +177,3 @@
 .settings span { position: relative; }
 .settings span::before { position: absolute; top: -5px; }
 .settings span::after { position: absolute; top: 5px; }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes breathe {
-  50% { box-shadow: 0 0 0 8px currentcolor; opacity: 0.05; }
-}
-
-@keyframes nudge {
-  50% { box-shadow: 0 0 0 5px rgb(214 155 61 / 0.16); }
-}

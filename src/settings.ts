@@ -14,6 +14,8 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 
 const agents = el("agents");
 const autostart = el<HTMLInputElement>("autostart");
+const message = el("message");
+autostart.disabled = true;
 
 function card(integration: Integration): HTMLElement {
   const element = document.createElement("div");
@@ -33,7 +35,7 @@ function card(integration: Integration): HTMLElement {
   head.querySelector(".agent-name")!.textContent = integration.label;
 
   const status = head.querySelector(".status") as HTMLElement;
-  status.textContent = integration.available ? "Connected" : "Not installed";
+  status.textContent = integration.available ? "Detected" : "Not installed";
   status.classList.toggle("on", integration.available);
 
   body.append(head);
@@ -49,6 +51,7 @@ async function render() {
   ]);
 
   autostart.checked = prefs.autostart;
+  autostart.disabled = false;
 
   const wrapper = document.createElement("div");
   wrapper.className = "card";
@@ -56,10 +59,20 @@ async function render() {
   agents.replaceChildren(wrapper);
 }
 
-autostart.addEventListener("change", () =>
-  invoke("set_autostart", { enabled: autostart.checked }).catch(() => {
-    autostart.checked = !autostart.checked;
-  }),
-);
+autostart.addEventListener("change", async () => {
+  const enabled = autostart.checked;
+  autostart.disabled = true;
+  message.textContent = "";
+  try {
+    await invoke("set_autostart", { enabled });
+  } catch (error) {
+    autostart.checked = !enabled;
+    message.textContent = `Could not change Open at login: ${String(error)}`;
+  } finally {
+    autostart.disabled = false;
+  }
+});
 
-render();
+render().catch((error) => {
+  message.textContent = `Could not load settings: ${String(error)}`;
+});

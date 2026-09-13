@@ -17,6 +17,10 @@ let filter: State | null = null;
 let drawn = "";
 let sized = 0;
 let held = false;
+let received = false;
+let visible = false;
+let timer: ReturnType<typeof setTimeout> | undefined;
+let shown: SessionEvent[] = [];
 
 const mine = () => sessions.filter((session) => session.agent === agent);
 
@@ -29,6 +33,7 @@ function label(id: string) {
 function pill(state: State, total: number): HTMLElement {
   const button = document.createElement("button");
   button.className = filter === state ? "selected" : "";
+  button.setAttribute("aria-pressed", String(filter === state));
   button.innerHTML = `${STATE_TEXT[state]} <b></b>`;
   button.querySelector("b")!.textContent = `${total}`;
   button.onclick = () => {
@@ -39,14 +44,15 @@ function pill(state: State, total: number): HTMLElement {
 }
 
 function sessionRow(session: SessionEvent): HTMLElement {
-  const row = document.createElement("div");
+  const row = document.createElement("button");
+  row.disabled = !session.cwd;
   row.className = "session";
   row.title = session.cwd ? `Open ${session.project_name} in Finder` : "";
   row.innerHTML = `
     <span class="session-ring ${session.state}"></span>
     <span>
-      <div class="project"></div>
-      <div class="state"></div>
+      <span class="project"></span>
+      <span class="state"></span>
     </span>
     <span class="elapsed"></span>`;
 
@@ -66,15 +72,22 @@ function sessionRow(session: SessionEvent): HTMLElement {
   return row;
 }
 
-function signature(list: SessionEvent[]) {
-  return list.map((s) => `${s.session_id}:${s.state}:${s.started_at}`).join("|");
+function tick() {
+  clearTimeout(timer);
+  timer = undefined;
+  if (!visible) return;
+  list.querySelectorAll(".elapsed").forEach((element, index) => {
+    const text = elapsed(shown[index]);
+    if (element.textContent !== text) element.textContent = text;
+  });
+  if (shown.some((session) => isLive(session.state))) timer = setTimeout(tick, 1000);
 }
 
 function render(force = false) {
   const all = mine();
   if (filter && !all.some((session) => session.state === filter)) filter = null;
 
-  const stamp = `${filter}|${signature(all)}|${all.filter((s) => isLive(s.state)).map(elapsed).join()}`;
+  const stamp = JSON.stringify([filter, all]);
   if (!force && stamp === drawn) return;
   drawn = stamp;
 
@@ -86,40 +99,48 @@ function render(force = false) {
     ...tallies.filter(([, n]) => n > 0).map(([state, n]) => pill(state, n)),
   );
 
-  const shown = filter ? all.filter((session) => session.state === filter) : all;
+  shown = filter ? all.filter((session) => session.state === filter) : all;
   if (!shown.length) {
     list.innerHTML = `<p class="empty">Nothing running</p>`;
   } else {
     list.replaceChildren(...shown.map(sessionRow));
   }
-
+  tick();
 }
 
 const card = document.querySelector(".popover") as HTMLElement;
 
-new ResizeObserver(() => {
+function resize() {
   const height = Math.ceil(card.getBoundingClientRect().height);
   if (height === sized || height === 0) return;
 
   sized = height;
   invoke("size_popover", { agent, height }).catch(report);
-}).observe(card);
+}
 
-listen<SessionEvent[]>("sessions", (event) => {
+new ResizeObserver(resize).observe(card);
+
+Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
+await listen<SessionEvent[]>("sessions", (event) => {
+  received = true;
   sessions = event.payload;
   render();
 });
-
-setInterval(async () => {
-  sessions = await invoke<SessionEvent[]>("get_sessions");
-  render();
-}, 1000);
-
-getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+await getCurrentWindow().listen<boolean>("popover-visibility", ({ payload }) => {
+  visible = payload;
+  if (visible) {
+    sized = 0;
+    resize();
+  }
+  tick();
+});
+await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
   if (focused) held = true;
   else if (held) invoke("close_popover", { agent }).catch(report);
 });
 
-sessions = await invoke<SessionEvent[]>("get_sessions");
-Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
+const initial = await invoke<SessionEvent[]>("get_sessions");
+if (!received) sessions = initial;
+visible = await getCurrentWindow().isVisible();
+held = await getCurrentWindow().isFocused();
 render(true);

@@ -16,6 +16,8 @@ const report = (error: unknown) => console.error("ledge rail:", error);
 let sessions: SessionEvent[] = [];
 let openAgent: string | null = null;
 let drawn = "";
+let agentCount = -1;
+let received = false;
 
 function label(agent: string) {
   return labels[agent] ?? agent;
@@ -23,8 +25,9 @@ function label(agent: string) {
 
 function agentNode(agent: string, group: SessionEvent[]): HTMLElement {
   const node = document.createElement("button");
-  node.className = `node ${worstOf(group)}`;
-  node.setAttribute("aria-label", `${label(agent)}, ${STATE_TEXT[worstOf(group)]}`);
+  const state = worstOf(group);
+  node.className = `node ${state}`;
+  node.setAttribute("aria-label", `${label(agent)}, ${STATE_TEXT[state]}`);
   node.append(mark(agent, label(agent)));
 
   if (group.length > 1) {
@@ -51,16 +54,11 @@ function closePopover() {
   invoke("close_popover").catch(report);
 }
 
-function signature(list: SessionEvent[]) {
-  return list.map((s) => `${s.agent}:${s.session_id}:${s.state}`).join("|");
-}
-
 function render(force = false) {
-  const stamp = signature(sessions);
+  const groups = [...byAgent(sessions)].sort(([a], [b]) => a.localeCompare(b));
+  const stamp = JSON.stringify(groups.map(([agent, group]) => [agent, group.length, worstOf(group)]));
   if (!force && stamp === drawn) return;
   drawn = stamp;
-
-  const groups = [...byAgent(sessions)];
 
   orb.className = `orb ${worstOf(sessions)}`;
   orb.title = sessions.length
@@ -69,7 +67,10 @@ function render(force = false) {
 
   nodes.replaceChildren(...groups.map(([agent, group]) => agentNode(agent, group)));
 
-  invoke("set_agent_count", { count: groups.length }).catch(report);
+  if (groups.length !== agentCount) {
+    agentCount = groups.length;
+    invoke("set_agent_count", { count: agentCount }).catch(report);
+  }
 
   if (openAgent && !groups.some(([agent]) => agent === openAgent)) closePopover();
 }
@@ -78,21 +79,17 @@ orb.addEventListener("click", () => (openAgent ? closePopover() : undefined));
 
 settingsButton.addEventListener("click", (event) => {
   event.stopPropagation();
-  invoke("open_settings");
+  invoke("open_settings").catch(report);
 });
 
-listen<SessionEvent[]>("sessions", (event) => {
+Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
+await listen<SessionEvent[]>("sessions", (event) => {
+  received = true;
   sessions = event.payload;
   render();
 });
+await listen("popover-closed", () => (openAgent = null));
 
-setInterval(async () => {
-  sessions = await invoke<SessionEvent[]>("get_sessions");
-  render();
-}, 1000);
-
-listen("popover-closed", () => (openAgent = null));
-
-sessions = await invoke<SessionEvent[]>("get_sessions");
-Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
+const initial = await invoke<SessionEvent[]>("get_sessions");
+if (!received) sessions = initial;
 render(true);
