@@ -248,19 +248,16 @@ pub fn open_settings(app: AppHandle) -> Command<()> {
         return Ok(());
     }
 
-    let window =
-        WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
-            .title("Ledge Settings")
-            .inner_size(460.0, 560.0)
-            .min_inner_size(460.0, 420.0)
-            .resizable(true)
-            .title_bar_style(tauri::TitleBarStyle::Transparent)
-            .transparent(true)
-            .center()
-            .build()
-            .map_err(|e| e.to_string())?;
+    WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
+        .title("Ledge Settings")
+        .inner_size(460.0, 560.0)
+        .min_inner_size(460.0, 420.0)
+        .resizable(true)
+        .title_bar_style(tauri::TitleBarStyle::Transparent)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
 
-    window::apply_material(&window, 12.0);
     Ok(())
 }
 
