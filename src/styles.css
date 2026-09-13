@@ -33,38 +33,43 @@
 }
 
 .orb-halo {
-  inset: 0;
+  inset: -3px;
   border: 1px solid currentcolor;
   box-shadow: 0 0 0 4px currentcolor;
   color: var(--blue);
 }
 
 .orb-arc {
-  inset: -2px;
+  inset: -3px;
   border: 1.5px solid transparent;
   border-top-color: var(--blue);
   border-right-color: var(--blue);
 }
 
-.orb-core {
+.orb-mark {
   position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  background: var(--muted);
-  transition: background 0.35s var(--ease), box-shadow 0.35s var(--ease);
+  inset: 2px;
+  width: 24px;
+  height: 24px;
+  overflow: visible;
+  transform: scale(1.1);
 }
 
-.orb-core::after {
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.88);
-  content: "";
+.orb-mark path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linecap: round;
+  stroke-width: 8px;
+}
+
+.orb-mark circle {
+  fill: var(--muted);
+  transition: fill 0.35s var(--ease), filter 0.35s var(--ease);
 }
 
 .orb.working .orb-halo { opacity: 0.1; }
 .orb.working .orb-arc { animation: spin 2.7s linear infinite; opacity: 1; }
-.orb.working .orb-core { background: var(--blue); box-shadow: 0 0 7px var(--blue); }
+.orb.working .orb-mark circle { fill: var(--blue); filter: drop-shadow(0 0 5px var(--blue)); }
 
 .orb.waiting .orb-halo {
   animation: breathe 2.6s ease-in-out infinite;
@@ -72,9 +77,9 @@
   opacity: 0.18;
 }
 
-.orb.waiting .orb-core { background: var(--amber); box-shadow: 0 0 7px var(--amber); }
-.orb.completed .orb-core { background: var(--green); }
-.orb.failed .orb-core { background: var(--red); }
+.orb.waiting .orb-mark circle { fill: var(--amber); filter: drop-shadow(0 0 5px var(--amber)); }
+.orb.completed .orb-mark circle { fill: var(--green); }
+.orb.failed .orb-mark circle { fill: var(--red); }
 
 .nodes {
   display: flex;
