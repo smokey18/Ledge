@@ -24,6 +24,46 @@ pub fn popover_height(rows: usize) -> f64 {
 const VISIBLE_MARGIN: f64 = 60.0;
 const MOVE_SETTLE: Duration = Duration::from_millis(600);
 
+#[cfg(target_os = "macos")]
+use tauri_nspanel::{tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt};
+
+#[cfg(target_os = "macos")]
+tauri_panel! {
+    panel!(LedgePanel {
+        config: {
+            can_become_key_window: true,
+            can_become_main_window: false,
+            is_floating_panel: true
+        }
+    })
+}
+
+#[cfg(target_os = "macos")]
+pub fn float_over_fullscreen(window: &WebviewWindow) {
+    let panel = match window.to_panel::<LedgePanel>() {
+        Ok(panel) => panel,
+        Err(error) => {
+            eprintln!(
+                "ledge: [{}] could not create panel: {error}",
+                window.label()
+            );
+            return;
+        }
+    };
+
+    panel.set_level(PanelLevel::Status.value());
+    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+    panel.set_collection_behavior(
+        CollectionBehavior::new()
+            .can_join_all_spaces()
+            .full_screen_auxiliary()
+            .into(),
+    );
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn float_over_fullscreen(_window: &WebviewWindow) {}
+
 /// Real NSVisualEffectView; CSS can only approximate it.
 pub fn apply_material(window: &WebviewWindow, radius: f64) {
     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};

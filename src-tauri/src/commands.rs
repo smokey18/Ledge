@@ -103,6 +103,7 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
     .always_on_top(true)
     .skip_taskbar(true)
     .accept_first_mouse(true)
+    .visible_on_all_workspaces(true)
     .resizable(false)
     .shadow(true)
     .visible(false)
@@ -110,6 +111,7 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
     .map_err(|e| e.to_string())?;
 
     window::apply_material(&window, 16.0);
+    window::float_over_fullscreen(&window);
     place(&app, &label, height);
     let _ = window.show();
     Ok(())

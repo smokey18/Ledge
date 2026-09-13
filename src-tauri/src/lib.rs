@@ -19,7 +19,7 @@ use tauri::{
 };
 use tauri_plugin_autostart::MacosLauncher;
 
-const SWEEP_INTERVAL: Duration = Duration::from_secs(60);
+const SWEEP_INTERVAL: Duration = Duration::from_secs(10);
 
 pub fn now_ms() -> i64 {
     SystemTime::now()
@@ -126,6 +126,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -160,8 +161,10 @@ pub fn run() {
 
             if let Some(main) = app.get_webview_window("main") {
                 window::apply_material(&main, 39.0);
+                window::float_over_fullscreen(&main);
                 let _ = main.set_size(window::rail_size(1));
                 window::restore(&main, &positions, last_display.as_deref());
+                let _ = main.show();
             }
 
             if let Err(error) = ipc::start(handle.clone()) {

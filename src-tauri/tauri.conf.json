@@ -22,11 +22,12 @@
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
         "resizable": false,
         "skipTaskbar": true,
         "acceptFirstMouse": true,
         "shadow": true,
-        "visible": true
+        "visible": false
       }
     ],
     "security": {
