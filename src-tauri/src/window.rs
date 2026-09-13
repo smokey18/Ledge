@@ -17,7 +17,7 @@ pub const POPOVER_WIDTH: f64 = 268.0;
 
 pub fn popover_height(rows: usize) -> f64 {
     let rows = rows.max(1) as f64;
-    26.0 + 29.0 + (28.0 * rows + 10.0 * (rows - 1.0))
+    26.0 + 31.0 + (31.0 * rows + 10.0 * (rows - 1.0))
 }
 
 /// Enough of the widget must stay on screen to be grabbable.

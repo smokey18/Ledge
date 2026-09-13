@@ -66,15 +66,11 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
 
         if dismissing {
             drop(popover);
-            close_popover(app);
+            close_popover(app, None);
             return Ok(());
         }
         popover.anchor = anchor;
         popover.open = Some(agent.clone());
-    }
-
-    if let Some(existing) = app.get_webview_window("popover") {
-        let _ = existing.close();
     }
 
     let rows = app
@@ -84,12 +80,24 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
         .filter(|session| session.agent == agent)
         .count();
 
+    let height = window::popover_height(rows);
+    let label = popover_label(&agent);
+    hide_popovers(&app, Some(&label));
+
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.set_size(tauri::LogicalSize::new(window::POPOVER_WIDTH, height));
+        place(&app, &label, height);
+        let _ = existing.show();
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+
     let window = WebviewWindowBuilder::new(
         &app,
-        "popover",
+        &label,
         WebviewUrl::App(format!("popover.html?agent={agent}").into()),
     )
-    .inner_size(window::POPOVER_WIDTH, window::popover_height(rows))
+    .inner_size(window::POPOVER_WIDTH, height)
     .decorations(false)
     .transparent(true)
     .always_on_top(true)
@@ -102,15 +110,27 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
     .map_err(|e| e.to_string())?;
 
     window::apply_material(&window, 16.0);
-    place(&app, window::popover_height(rows));
+    place(&app, &label, height);
     let _ = window.show();
     Ok(())
 }
 
-fn place(app: &AppHandle, height: f64) {
+fn popover_label(agent: &str) -> String {
+    format!("popover-{agent}")
+}
+
+fn hide_popovers(app: &AppHandle, except: Option<&str>) {
+    for (label, window) in app.webview_windows() {
+        if label.starts_with("popover-") && Some(label.as_str()) != except {
+            let _ = window.hide();
+        }
+    }
+}
+
+fn place(app: &AppHandle, label: &str, height: f64) {
     let (Some(main), Some(popover)) = (
         app.get_webview_window("main"),
-        app.get_webview_window("popover"),
+        app.get_webview_window(label),
     ) else {
         return;
     };
@@ -146,26 +166,34 @@ fn place(app: &AppHandle, height: f64) {
 }
 
 #[tauri::command]
-pub fn size_popover(app: AppHandle, height: f64) {
-    if let Some(popover) = app.get_webview_window("popover") {
+pub fn size_popover(app: AppHandle, agent: String, height: f64) {
+    let label = popover_label(&agent);
+    let open = app.state::<PopoverState>().0.lock().unwrap().open.clone();
+    if open.as_deref() != Some(agent.as_str()) {
+        return;
+    }
+
+    if let Some(popover) = app.get_webview_window(&label) {
         let _ = popover.set_size(tauri::LogicalSize::new(window::POPOVER_WIDTH, height));
     }
-    place(&app, height);
+    place(&app, &label, height);
 }
 
 #[tauri::command]
-pub fn close_popover(app: AppHandle) {
+pub fn close_popover(app: AppHandle, agent: Option<String>) {
     {
         let state = app.state::<PopoverState>();
         let mut popover = state.0.lock().unwrap();
+
+        if agent.is_some() && popover.open != agent {
+            return;
+        }
         if let Some(agent) = popover.open.take() {
             popover.closed = Some((agent, Instant::now()));
         }
     }
 
-    if let Some(window) = app.get_webview_window("popover") {
-        let _ = window.close();
-    }
+    hide_popovers(&app, None);
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.emit("popover-closed", ());
     }

@@ -89,7 +89,7 @@ listen<SessionEvent[]>("sessions", (event) => {
 setInterval(async () => {
   sessions = await invoke<SessionEvent[]>("get_sessions");
   render();
-}, 2000);
+}, 1000);
 
 listen("popover-closed", () => (openAgent = null));
 

@@ -16,7 +16,7 @@ let sessions: SessionEvent[] = [];
 let filter: State | null = null;
 let drawn = "";
 let sized = 0;
-let clock: number | undefined;
+let held = false;
 
 const mine = () => sessions.filter((session) => session.agent === agent);
 
@@ -51,9 +51,10 @@ function sessionRow(session: SessionEvent): HTMLElement {
     <span class="elapsed"></span>`;
 
   row.querySelector(".session-ring")!.append(mark(session.agent, label(session.agent)));
-  row.querySelector(".project")!.textContent = session.project_name;
-  row.querySelector(".state")!.textContent =
-    `${label(session.agent)} · ${STATE_TEXT[session.state]}`;
+  row.querySelector(".project")!.textContent = session.title ?? session.project_name;
+  row.querySelector(".state")!.textContent = session.title
+    ? `${session.project_name} · ${STATE_TEXT[session.state]}`
+    : `${label(session.agent)} · ${STATE_TEXT[session.state]}`;
   row.querySelector(".elapsed")!.textContent = elapsed(session);
 
   if (session.cwd) {
@@ -92,37 +93,31 @@ function render(force = false) {
     list.replaceChildren(...shown.map(sessionRow));
   }
 
-  resize();
-  syncClock(all.some((session) => isLive(session.state)));
 }
 
-function syncClock(live: boolean) {
-  if (live && clock === undefined) {
-    clock = window.setInterval(render, 1000);
-  } else if (!live && clock !== undefined) {
-    clearInterval(clock);
-    clock = undefined;
-  }
-}
+const card = document.querySelector(".popover") as HTMLElement;
 
-function resize() {
-  const card = document.querySelector(".popover") as HTMLElement;
+new ResizeObserver(() => {
   const height = Math.ceil(card.getBoundingClientRect().height);
-  if (height === sized) return;
+  if (height === sized || height === 0) return;
 
   sized = height;
-  invoke("size_popover", { height }).catch(report);
-}
+  invoke("size_popover", { agent, height }).catch(report);
+}).observe(card);
 
 listen<SessionEvent[]>("sessions", (event) => {
   sessions = event.payload;
   render();
 });
 
-let held = false;
+setInterval(async () => {
+  sessions = await invoke<SessionEvent[]>("get_sessions");
+  render();
+}, 1000);
+
 getCurrentWindow().onFocusChanged(({ payload: focused }) => {
   if (focused) held = true;
-  else if (held) invoke("close_popover").catch(report);
+  else if (held) invoke("close_popover", { agent }).catch(report);
 });
 
 sessions = await invoke<SessionEvent[]>("get_sessions");

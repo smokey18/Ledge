@@ -182,7 +182,7 @@ pub fn run() {
                 window::recenter_if_stranded(window);
                 window::remember_position(window);
                 if window.label() == "main" {
-                    commands::close_popover(window.app_handle().clone());
+                    commands::close_popover(window.app_handle().clone(), None);
                 }
             }
             WindowEvent::ScaleFactorChanged { .. } => window::recenter_if_stranded(window),
