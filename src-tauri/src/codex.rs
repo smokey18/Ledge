@@ -19,6 +19,28 @@ struct Rollout {
     cwd: String,
     root: bool,
     active: bool,
+    title: Option<String>,
+}
+const TITLE_MAX: usize = 80;
+
+fn prompt_title(value: &Value) -> Option<String> {
+    let payload = value.get("payload")?;
+    if payload.get("role")?.as_str()? != "user" {
+        return None;
+    }
+
+    let text = payload
+        .get("content")?
+        .as_array()?
+        .iter()
+        .find_map(|part| part.get("text")?.as_str())?;
+
+    let line = text.lines().find(|line| !line.trim().is_empty())?.trim();
+    if line.starts_with('<') || line.starts_with('#') {
+        return None;
+    }
+
+    Some(line.chars().take(TITLE_MAX).collect())
 }
 
 pub const EVENTS: &[&str] = &[
@@ -57,6 +79,8 @@ pub fn map(payload: &Value) -> Option<Incoming> {
         project_name: crate::state::project_name(cwd),
         cwd: cwd.to_string(),
         state,
+        transcript: None,
+        title: None,
     })
 }
 
@@ -73,6 +97,8 @@ pub fn map_notify(payload: &Value) -> Option<Incoming> {
         project_name: crate::state::project_name(cwd),
         cwd: cwd.to_string(),
         state: Signal::Completed,
+        transcript: None,
+        title: None,
     })
 }
 
@@ -209,6 +235,11 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
             Some("session_meta") => {
                 apply_meta(&value, rollout);
             }
+            Some("response_item") => {
+                if rollout.title.is_none() {
+                    rollout.title = prompt_title(&value);
+                }
+            }
             Some("turn_context") => {
                 rollout.cwd = value
                     .get("payload")
@@ -253,6 +284,8 @@ fn push(events: &mut Vec<Incoming>, rollout: &Rollout, state: Signal) {
             project_name: crate::state::project_name(&rollout.cwd),
             cwd: rollout.cwd.clone(),
             state,
+            transcript: None,
+            title: rollout.title.clone(),
         });
     }
 }
@@ -260,6 +293,27 @@ fn push(events: &mut Vec<Incoming>, rollout: &Rollout, state: Signal) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn user(text: &str) -> Value {
+        json!({"type": "response_item", "payload": {"type": "message", "role": "user",
+               "content": [{"type": "input_text", "text": text}]}})
+    }
+
+    #[test]
+    fn the_title_is_the_first_prompt_the_user_actually_typed() {
+        assert_eq!(prompt_title(&user("<recommended_plugins> ...")), None);
+        assert_eq!(prompt_title(&user("# AGENTS.md instructions\n\n<INSTRUCTIONS>")), None);
+        assert_eq!(
+            prompt_title(&json!({"payload": {"role": "assistant",
+                "content": [{"text": "hello say it back"}]}})),
+            None
+        );
+        assert_eq!(
+            prompt_title(&user("\n  hello say it back \nsecond line")).as_deref(),
+            Some("hello say it back")
+        );
+        assert_eq!(prompt_title(&user(&"x".repeat(200))).unwrap().chars().count(), TITLE_MAX);
+    }
     use serde_json::json;
     use std::io::Write;
 

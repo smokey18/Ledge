@@ -39,8 +39,13 @@ pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
     dispatch_incoming(app, incoming);
 }
 
-pub fn dispatch_incoming(app: &AppHandle, incoming: state::Incoming) {
+pub fn dispatch_incoming(app: &AppHandle, mut incoming: state::Incoming) {
     let ledge = app.state::<Ledge>();
+
+    if incoming.title.is_none() && ledge.needs_title(&incoming.session_id) {
+        incoming.title = incoming.transcript.as_deref().and_then(claude::title_from);
+    }
+
     if ledge.apply(incoming, now_ms()).is_some() {
         ledge.save(app);
         broadcast(app);

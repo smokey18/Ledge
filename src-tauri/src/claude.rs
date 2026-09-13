@@ -38,7 +38,30 @@ pub fn map(payload: &Value) -> Option<Incoming> {
         project_name: crate::state::project_name(cwd),
         cwd: cwd.to_string(),
         state,
+        transcript: payload
+            .get("transcript_path")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        title: None,
     })
+}
+
+const TITLE_SCAN_LINES: usize = 200;
+
+pub fn title_from(transcript: &str) -> Option<String> {
+    use std::io::{BufRead, BufReader};
+
+    let file = std::fs::File::open(transcript).ok()?;
+
+    BufReader::new(file)
+        .lines()
+        .take(TITLE_SCAN_LINES)
+        .map_while(Result::ok)
+        .filter(|line| line.contains(r#""ai-title""#))
+        .filter_map(|line| serde_json::from_str::<Value>(&line).ok())
+        .find_map(|value| {
+            Some(value.get("aiTitle")?.as_str()?.trim().to_string()).filter(|t| !t.is_empty())
+        })
 }
 
 #[cfg(test)]

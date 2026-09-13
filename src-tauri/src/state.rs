@@ -43,6 +43,8 @@ pub struct Incoming {
     pub project_name: String,
     pub cwd: String,
     pub state: Signal,
+    pub transcript: Option<String>,
+    pub title: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,6 +52,8 @@ pub struct SessionEvent {
     pub session_id: String,
     pub agent: String,
     pub project_name: String,
+    #[serde(default)]
+    pub title: Option<String>,
     #[serde(default)]
     pub cwd: String,
     pub state: State,
@@ -127,6 +131,14 @@ impl Ledge {
         }
     }
 
+    pub fn needs_title(&self, session_id: &str) -> bool {
+        self.sessions
+            .lock()
+            .unwrap()
+            .get(session_id)
+            .is_none_or(|session| session.title.is_none())
+    }
+
     pub fn snapshot(&self) -> Vec<SessionEvent> {
         let mut sessions: Vec<SessionEvent> = self
             .sessions
@@ -145,7 +157,9 @@ impl Ledge {
 
         // A fresh session replaces old results for the same agent and project,
         // but another live session may genuinely be running beside it.
-        if incoming.state == Signal::Working && !incoming.cwd.is_empty() {
+        let is_new = !sessions.contains_key(&incoming.session_id);
+
+        if is_new && incoming.state == Signal::Working && !incoming.cwd.is_empty() {
             sessions.retain(|id, session| {
                 id == &incoming.session_id
                     || session.agent != incoming.agent
@@ -173,11 +187,16 @@ impl Ledge {
                 session_id: incoming.session_id,
                 agent: incoming.agent,
                 project_name: incoming.project_name.clone(),
+                title: incoming.title.clone(),
                 cwd: incoming.cwd.clone(),
                 state,
                 started_at: now,
                 updated_at: now,
             });
+
+        if incoming.title.is_some() {
+            session.title = incoming.title.clone();
+        }
 
         if state == State::Working && !session.state.is_active() {
             session.started_at = now;
@@ -259,6 +278,8 @@ mod tests {
             project_name: "Ledge".into(),
             cwd: "/Users/x/Ledge".into(),
             state,
+            transcript: None,
+            title: None,
         }
     }
 
@@ -332,6 +353,37 @@ mod tests {
 
         ledge.sweep(FORGET_RESULT_MS + 1);
         assert!(ledge.is_empty());
+    }
+
+    #[test]
+    fn work_in_a_live_session_does_not_clear_a_sibling_result() {
+        let ledge = store();
+        ledge.apply(incoming(Signal::Completed), 0);
+        ledge.apply(
+            Incoming {
+                session_id: "s2".into(),
+                ..incoming(Signal::Working)
+            },
+            1,
+        );
+        ledge.apply(
+            Incoming {
+                session_id: "s3".into(),
+                ..incoming(Signal::Completed)
+            },
+            2,
+        );
+
+        for tick in 3..6 {
+            ledge.apply(
+                Incoming {
+                    session_id: "s2".into(),
+                    ..incoming(Signal::Working)
+                },
+                tick,
+            );
+        }
+        assert_eq!(ledge.snapshot().len(), 2);
     }
 
     #[test]

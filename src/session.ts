@@ -4,6 +4,7 @@ export interface SessionEvent {
   session_id: string;
   agent: string;
   project_name: string;
+  title: string | null;
   cwd: string;
   state: State;
   started_at: number;
