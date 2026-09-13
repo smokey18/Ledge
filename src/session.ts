@@ -19,7 +19,7 @@ export const STATE_TEXT: Record<State, string> = {
   idle: "Idle",
 };
 
-export const SEVERITY: State[] = ["waiting", "failed", "working", "completed", "idle"];
+export const SEVERITY: State[] = ["waiting", "working", "failed", "completed", "idle"];
 
 export const COUNTED: State[] = ["working", "waiting", "completed", "failed"];
 
