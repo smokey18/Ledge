@@ -80,7 +80,7 @@ pub fn rail_size(agents: usize) -> LogicalSize<f64> {
     const NODE_PADDING: f64 = 20.0 + 26.0;
 
     if agents == 0 {
-        return LogicalSize::new(RAIL_WIDTH, ENDS + 14.0);
+        return LogicalSize::new(RAIL_WIDTH, RAIL_WIDTH);
     }
 
     let agents = agents as f64;

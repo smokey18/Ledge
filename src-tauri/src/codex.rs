@@ -13,6 +13,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 const RETRY_INTERVAL: Duration = Duration::from_secs(30);
+const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const INITIAL_RECENCY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Default)]
@@ -146,11 +147,16 @@ pub fn start(app: AppHandle) {
                 }
             };
 
-            while let Ok(event) = rx.recv() {
+            loop {
+                let first = match rx.recv_timeout(POLL_INTERVAL) {
+                    Ok(event) => Some(event),
+                    Err(mpsc::RecvTimeoutError::Timeout) => None,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                };
                 let mut paths = HashSet::new();
                 let mut rescan = false;
                 let mut failed = false;
-                for event in std::iter::once(event).chain(rx.try_iter()) {
+                for event in first.into_iter().chain(rx.try_iter()) {
                     match event {
                         Ok(event) => {
                             rescan |= event.need_rescan();
@@ -181,6 +187,12 @@ pub fn start(app: AppHandle) {
                         rollouts.retain(|file, _| !file.starts_with(&path));
                     }
                 }
+                files.extend(
+                    rollouts
+                        .iter()
+                        .filter(|(_, rollout)| rollout.active)
+                        .map(|(path, _)| path.clone()),
+                );
                 for path in files {
                     for event in update_rollout(&path, &mut rollouts, false) {
                         crate::dispatch_incoming(&app, event);
