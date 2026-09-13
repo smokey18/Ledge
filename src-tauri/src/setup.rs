@@ -152,6 +152,10 @@ pub fn disconnect(agent: &str) -> io::Result<()> {
 
     let mut root = read_json(&path);
     drop_hooks(&mut root);
+
+    if root.as_object().is_some_and(serde_json::Map::is_empty) {
+        return std::fs::remove_file(&path).or(Ok(()));
+    }
     write_json(&path, &root)
 }
 
