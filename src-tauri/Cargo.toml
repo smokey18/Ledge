@@ -23,6 +23,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
+notify = "8.2"
 shlex = "2"
 serde_json = { version = "1", features = ["preserve_order"] }
 toml_edit = "0.22"

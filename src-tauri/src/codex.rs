@@ -1,20 +1,24 @@
 //! Verified against Codex CLI 0.154.0-alpha.6.2.
 
 use crate::state::{Incoming, Signal};
+use notify::{RecursiveMode, Watcher};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use std::time::Duration;
 use tauri::AppHandle;
 
-const POLL_INTERVAL: Duration = Duration::from_millis(500);
+const RETRY_INTERVAL: Duration = Duration::from_secs(30);
 const INITIAL_RECENCY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Default)]
 struct Rollout {
     offset: u64,
+    inode: u64,
     session_id: String,
     cwd: String,
     root: bool,
@@ -104,47 +108,129 @@ pub fn map_notify(payload: &Value) -> Option<Incoming> {
 
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
-        let root =
-            PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".codex/sessions");
+        let root = std::env::var_os("CODEX_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".codex")
+            })
+            .join("sessions");
         let mut rollouts = HashMap::new();
         let mut first_scan = true;
 
         loop {
+            if !root.is_dir() {
+                std::thread::sleep(RETRY_INTERVAL);
+                continue;
+            }
+            let Ok(root) = root.canonicalize() else {
+                std::thread::sleep(RETRY_INTERVAL);
+                continue;
+            };
+            let (tx, rx) = mpsc::channel();
+            let watcher = notify::recommended_watcher(tx).and_then(|mut watcher| {
+                watcher.watch(&root, RecursiveMode::Recursive)?;
+                Ok(watcher)
+            });
             for path in files_under(&root) {
-                let Ok(metadata) = path.metadata() else {
-                    continue;
-                };
-                let new = !rollouts.contains_key(&path);
-                let rollout = rollouts.entry(path.clone()).or_default();
-
-                if (new && !first_scan)
-                    || metadata
-                        .modified()
-                        .ok()
-                        .and_then(|time| time.elapsed().ok())
-                        .is_some_and(|age| age <= INITIAL_RECENCY)
-                {
-                    let events = read_events(&path, rollout);
-                    if new {
-                        if let Some(event) = events.into_iter().last() {
-                            if !first_scan || event.state == Signal::Working {
-                                crate::dispatch_incoming(&app, event);
-                            }
-                        }
-                    } else {
-                        for event in events {
-                            crate::dispatch_incoming(&app, event);
-                        }
-                    }
-                } else if new {
-                    read_meta(&path, rollout);
-                    rollout.offset = metadata.len();
+                for event in update_rollout(&path, &mut rollouts, first_scan) {
+                    crate::dispatch_incoming(&app, event);
                 }
             }
             first_scan = false;
-            std::thread::sleep(POLL_INTERVAL);
+            let _watcher = match watcher {
+                Ok(watcher) => watcher,
+                Err(error) => {
+                    eprintln!("ledge: Codex watcher unavailable, retrying: {error}");
+                    std::thread::sleep(RETRY_INTERVAL);
+                    continue;
+                }
+            };
+
+            while let Ok(event) = rx.recv() {
+                let mut paths = HashSet::new();
+                let mut rescan = false;
+                let mut failed = false;
+                for event in std::iter::once(event).chain(rx.try_iter()) {
+                    match event {
+                        Ok(event) => {
+                            rescan |= event.need_rescan();
+                            if !event.kind.is_access() {
+                                paths.extend(event.paths);
+                            }
+                        }
+                        Err(error) => {
+                            eprintln!("ledge: Codex watcher failed: {error}");
+                            failed = true;
+                        }
+                    }
+                }
+                if failed || !root.is_dir() {
+                    break;
+                }
+                if rescan {
+                    paths = files_under(&root).into_iter().collect();
+                    rollouts.retain(|path, _| paths.contains(path));
+                }
+                let mut files = HashSet::new();
+                for path in paths {
+                    if path.is_dir() {
+                        files.extend(files_under(&path));
+                    } else if path.extension().is_some_and(|ext| ext == "jsonl") {
+                        files.insert(path);
+                    } else if !path.exists() {
+                        rollouts.retain(|file, _| !file.starts_with(&path));
+                    }
+                }
+                for path in files {
+                    for event in update_rollout(&path, &mut rollouts, false) {
+                        crate::dispatch_incoming(&app, event);
+                    }
+                }
+            }
         }
     });
+}
+
+fn update_rollout(
+    path: &Path,
+    rollouts: &mut HashMap<PathBuf, Rollout>,
+    first_scan: bool,
+) -> Vec<Incoming> {
+    let Ok(metadata) = path.metadata() else {
+        rollouts.remove(path);
+        return Vec::new();
+    };
+    let new = !rollouts.contains_key(path);
+    let rollout = rollouts.entry(path.to_path_buf()).or_default();
+    if new
+        && first_scan
+        && !metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.elapsed().ok())
+            .is_some_and(|age| age <= INITIAL_RECENCY)
+    {
+        rollout.offset = metadata.len();
+        rollout.inode = metadata.ino();
+        return Vec::new();
+    }
+    if metadata.len() == rollout.offset && metadata.ino() == rollout.inode {
+        return Vec::new();
+    }
+    if rollout.session_id.is_empty() && rollout.offset > 0 {
+        read_meta(path, rollout);
+    }
+    let events = read_events(path, rollout);
+    if new {
+        events
+            .into_iter()
+            .last()
+            .filter(|event| !first_scan || event.state == Signal::Working)
+            .into_iter()
+            .collect()
+    } else {
+        events
+    }
 }
 
 fn read_meta(path: &Path, rollout: &mut Rollout) {
@@ -187,9 +273,12 @@ fn files_under(root: &Path) -> Vec<PathBuf> {
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            if kind.is_dir() {
                 dirs.push(path);
-            } else if path.extension().is_some_and(|ext| ext == "jsonl") {
+            } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "jsonl") {
                 files.push(path);
             }
         }
@@ -201,12 +290,14 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
     let Ok(mut file) = File::open(path) else {
         return Vec::new();
     };
-    let Ok(length) = file.metadata().map(|metadata| metadata.len()) else {
+    let Ok(metadata) = file.metadata() else {
         return Vec::new();
     };
-    if length < rollout.offset {
-        rollout.offset = 0;
+    let length = metadata.len();
+    if length < rollout.offset || metadata.ino() != rollout.inode {
+        *rollout = Rollout::default();
     }
+    rollout.inode = metadata.ino();
     if file.seek(std::io::SeekFrom::Start(rollout.offset)).is_err() {
         return Vec::new();
     }
@@ -214,7 +305,6 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
     let mut reader = BufReader::new(file);
     let mut events = Vec::new();
     loop {
-        let start = reader.stream_position().unwrap_or(rollout.offset);
         let mut line = String::new();
         let Ok(read) = reader.read_line(&mut line) else {
             break;
@@ -223,10 +313,9 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
             break;
         }
         if !line.ends_with('\n') {
-            rollout.offset = start;
             break;
         }
-        rollout.offset = reader.stream_position().unwrap_or(length);
+        rollout.offset += read as u64;
 
         let Ok(value) = serde_json::from_str::<Value>(&line) else {
             continue;
@@ -238,6 +327,9 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
             Some("response_item") => {
                 if rollout.title.is_none() {
                     rollout.title = prompt_title(&value);
+                    if rollout.title.is_some() && rollout.active {
+                        push(&mut events, rollout, Signal::Working);
+                    }
                 }
             }
             Some("turn_context") => {
@@ -302,7 +394,10 @@ mod tests {
     #[test]
     fn the_title_is_the_first_prompt_the_user_actually_typed() {
         assert_eq!(prompt_title(&user("<recommended_plugins> ...")), None);
-        assert_eq!(prompt_title(&user("# AGENTS.md instructions\n\n<INSTRUCTIONS>")), None);
+        assert_eq!(
+            prompt_title(&user("# AGENTS.md instructions\n\n<INSTRUCTIONS>")),
+            None
+        );
         assert_eq!(
             prompt_title(&json!({"payload": {"role": "assistant",
                 "content": [{"text": "hello say it back"}]}})),
@@ -312,7 +407,13 @@ mod tests {
             prompt_title(&user("\n  hello say it back \nsecond line")).as_deref(),
             Some("hello say it back")
         );
-        assert_eq!(prompt_title(&user(&"x".repeat(200))).unwrap().chars().count(), TITLE_MAX);
+        assert_eq!(
+            prompt_title(&user(&"x".repeat(200)))
+                .unwrap()
+                .chars()
+                .count(),
+            TITLE_MAX
+        );
     }
     use serde_json::json;
     use std::io::Write;
@@ -360,6 +461,67 @@ mod tests {
         let other = json!({"type": "something-else", "thread-id": "t-1"});
         assert!(map_notify(&other).is_none());
         assert!(map_notify(&json!({})).is_none());
+    }
+
+    #[test]
+    fn native_watcher_reports_new_nested_rollouts() {
+        let root = std::env::temp_dir().join(format!("ledge-watch-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let root = root.canonicalize().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = notify::recommended_watcher(tx).unwrap();
+        watcher.watch(&root, RecursiveMode::Recursive).unwrap();
+        let nested = root.join("year/month/day");
+        std::fs::create_dir_all(&nested).unwrap();
+        let path = nested.join("session.jsonl");
+        std::fs::write(&path, "{}\n").unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let mut observed = false;
+        while let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now()) {
+            let Ok(Ok(event)) = rx.recv_timeout(remaining) else {
+                break;
+            };
+            if event
+                .paths
+                .iter()
+                .any(|changed| changed == &path || (changed.is_dir() && path.starts_with(changed)))
+            {
+                observed = true;
+                break;
+            }
+        }
+        drop(watcher);
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(
+            observed,
+            "native watcher missed a newly created nested rollout"
+        );
+    }
+
+    #[test]
+    fn partial_lines_wait_for_completion_and_truncation_resets_metadata() {
+        let path = std::env::temp_dir().join(format!("ledge-partial-{}.jsonl", std::process::id()));
+        let meta =
+            json!({"type":"session_meta","payload":{"id":"root","cwd":"/tmp","source":"cli"}});
+        let start = json!({"type":"event_msg","payload":{"type":"task_started"}});
+        std::fs::write(&path, format!("{meta}\n{start}")).unwrap();
+        let mut rollouts = HashMap::new();
+        assert!(update_rollout(&path, &mut rollouts, false).is_empty());
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+        writeln!(file).unwrap();
+        assert_eq!(
+            update_rollout(&path, &mut rollouts, false)[0].state,
+            Signal::Working
+        );
+        assert!(update_rollout(&path, &mut rollouts, false).is_empty());
+        std::fs::write(&path, format!("{start}\n")).unwrap();
+        assert!(update_rollout(&path, &mut rollouts, false).is_empty());
+        std::fs::remove_file(&path).unwrap();
+        assert!(update_rollout(&path, &mut rollouts, false).is_empty());
+        assert!(rollouts.is_empty());
     }
 
     #[test]
