@@ -86,6 +86,12 @@
   padding: 20px 0 26px;
 }
 
+.nodes:empty {
+  flex: none;
+  height: 14px;
+  padding: 0;
+}
+
 .nodes > * + *::before {
   position: absolute;
   top: -20px;

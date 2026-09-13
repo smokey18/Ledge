@@ -8,9 +8,8 @@ use tauri::{AppHandle, Manager};
 
 /// A `working` session with no event for this long is assumed dead.
 pub const STALE_MS: i64 = 10 * 60 * 1000;
-/// Idle sessions are noise; results are worth coming back to.
-const FORGET_IDLE_MS: i64 = 20 * 60 * 1000;
-const FORGET_RESULT_MS: i64 = 2 * 60 * 60 * 1000;
+const FORGET_MS: i64 = 60 * 1000;
+const FORGET_FAILED_MS: i64 = 10 * 60 * 1000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -228,9 +227,9 @@ impl Ledge {
         sessions.retain(|_, session| {
             let age = now - session.updated_at;
             match session.state {
-                State::Idle => age < FORGET_IDLE_MS,
-                State::Completed | State::Failed => age < FORGET_RESULT_MS,
-                _ => true,
+                state if state.is_active() => true,
+                State::Failed => age < FORGET_FAILED_MS,
+                _ => age < FORGET_MS,
             }
         });
 
@@ -328,12 +327,14 @@ mod tests {
     }
 
     #[test]
-    fn work_that_stops_reporting_goes_idle_not_working_forever() {
+    fn work_that_stops_reporting_is_dropped_not_left_working_forever() {
         let ledge = store();
         ledge.apply(incoming(Signal::Working), 0);
         assert!(!ledge.sweep(STALE_MS - 1));
+        assert_eq!(state_of(&ledge), State::Working);
+
         assert!(ledge.sweep(STALE_MS + 1));
-        assert_eq!(state_of(&ledge), State::Idle);
+        assert!(ledge.is_empty());
     }
 
     #[test]
@@ -348,10 +349,23 @@ mod tests {
             0,
         );
 
-        ledge.sweep(FORGET_IDLE_MS + 1);
+        ledge.sweep(FORGET_MS - 1);
         assert_eq!(ledge.snapshot().len(), 1);
 
-        ledge.sweep(FORGET_RESULT_MS + 1);
+        ledge.sweep(FORGET_MS + 1);
+        assert!(ledge.is_empty());
+    }
+
+    #[test]
+    fn a_failure_outlives_an_ordinary_result() {
+        let ledge = store();
+        ledge.apply(incoming(Signal::Working), 0);
+        ledge.apply(incoming(Signal::Ended), 1);
+
+        ledge.sweep(FORGET_MS + 1);
+        assert_eq!(state_of(&ledge), State::Failed);
+
+        ledge.sweep(FORGET_FAILED_MS + 1);
         assert!(ledge.is_empty());
     }
 
