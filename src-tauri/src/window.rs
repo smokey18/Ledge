@@ -9,7 +9,7 @@ use tauri::{
 
 pub struct TrayToggle(pub MenuItem<Wry>);
 
-pub const RAIL_WIDTH: f64 = 76.0;
+pub const RAIL_WIDTH: f64 = 58.0;
 
 pub const POPOVER_GAP: f64 = 9.0;
 
@@ -80,11 +80,11 @@ pub fn rail_size(agents: usize) -> LogicalSize<f64> {
     const NODE_PADDING: f64 = 20.0 + 26.0;
 
     if agents == 0 {
-        return LogicalSize::new(RAIL_WIDTH, RAIL_WIDTH);
+        return LogicalSize::new(RAIL_WIDTH, ENDS + 18.0);
     }
 
     let agents = agents as f64;
-    let nodes = 38.0 * agents + 20.0 * (agents - 1.0);
+    let nodes = 38.0 * agents + 10.0 * (agents - 1.0);
     LogicalSize::new(RAIL_WIDTH, ENDS + NODE_PADDING + nodes)
 }
 

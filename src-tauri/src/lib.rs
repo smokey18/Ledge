@@ -168,7 +168,7 @@ pub fn run() {
             }
 
             if let Some(main) = app.get_webview_window("main") {
-                window::apply_material(&main, 39.0);
+                window::apply_material(&main, 20.0);
                 window::float_over_fullscreen(&main);
                 let _ = main.set_size(window::rail_size(1));
                 window::restore(&main, &positions, last_display.as_deref());

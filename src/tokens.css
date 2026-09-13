@@ -21,6 +21,11 @@
   --green: #55b778;
   --red: #d96870;
 
+  --blue-fill: color-mix(in srgb, var(--blue) 14%, transparent);
+  --amber-fill: color-mix(in srgb, var(--amber) 14%, transparent);
+  --green-fill: color-mix(in srgb, var(--green) 14%, transparent);
+  --red-fill: color-mix(in srgb, var(--red) 14%, transparent);
+
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
