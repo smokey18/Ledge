@@ -23,6 +23,10 @@ pub fn start(app: AppHandle) -> std::io::Result<()> {
     std::fs::create_dir_all(&dir)?;
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
 
+    let lock = std::fs::File::create(dir.join("instance.lock"))?;
+    lock.try_lock().map_err(std::io::Error::other)?;
+    app.manage(lock);
+
     let path = socket_path();
     // A socket left by a crashed run would block the bind.
     let _ = std::fs::remove_file(&path);

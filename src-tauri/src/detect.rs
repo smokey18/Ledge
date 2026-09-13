@@ -63,10 +63,10 @@ fn find(agent: &str) -> Option<&'static Agent> {
 }
 
 pub fn is_available(agent: &str) -> bool {
-    find(agent)
-        .is_some_and(|agent| on_path(agent.executable).is_some() || home().join(agent.marker).is_dir())
+    find(agent).is_some_and(|agent| {
+        on_path(agent.executable).is_some() || home().join(agent.marker).is_dir()
+    })
 }
-
 
 #[cfg(test)]
 mod tests {

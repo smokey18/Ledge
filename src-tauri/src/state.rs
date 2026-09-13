@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
-/// A `working` session with no event for this long is assumed dead.
+/// Active sessions expire after this long without an event.
 pub const STALE_MS: i64 = 10 * 60 * 1000;
 const FORGET_MS: i64 = 60 * 1000;
 const FORGET_FAILED_MS: i64 = 10 * 60 * 1000;
@@ -122,11 +122,13 @@ impl Ledge {
     }
 
     pub fn save(&self, app: &AppHandle) {
-        let mut settings = self.settings.lock().unwrap().clone();
+        let mut settings = self.settings.lock().unwrap();
         settings.sessions = self.sessions.lock().unwrap().values().cloned().collect();
 
-        if let Ok(json) = serde_json::to_string_pretty(&settings) {
-            let _ = std::fs::write(settings_path(app), json);
+        if let Ok(json) = serde_json::to_vec(&*settings) {
+            if let Err(error) = crate::setup::write_atomic(&settings_path(app), &json) {
+                eprintln!("ledge: could not save settings: {error}");
+            }
         }
     }
 
@@ -147,7 +149,11 @@ impl Ledge {
             .filter(|session| session.state != State::Idle)
             .cloned()
             .collect();
-        sessions.sort_by_key(|session| Reverse(session.updated_at));
+        sessions.sort_by(|a, b| {
+            Reverse(a.updated_at)
+                .cmp(&Reverse(b.updated_at))
+                .then_with(|| a.session_id.cmp(&b.session_id))
+        });
         sessions
     }
 
@@ -193,15 +199,17 @@ impl Ledge {
                 updated_at: now,
             });
 
+        let title_changed = incoming.title.is_some() && session.title != incoming.title;
         if incoming.title.is_some() {
-            session.title = incoming.title.clone();
+            session.title = incoming.title;
         }
 
         if state == State::Working && !session.state.is_active() {
             session.started_at = now;
         }
 
-        let changed = session.state != state
+        let changed = title_changed
+            || session.state != state
             || session.project_name != incoming.project_name
             || session.cwd != incoming.cwd;
         session.state = state;
@@ -437,6 +445,23 @@ mod tests {
         }
         let order: Vec<String> = ledge.snapshot().into_iter().map(|s| s.session_id).collect();
         assert_eq!(order, ["b", "a"]);
+    }
+
+    #[test]
+    fn a_title_only_update_is_broadcast() {
+        let ledge = store();
+        ledge.apply(incoming(Signal::Working), 0);
+        assert_eq!(
+            ledge.apply(
+                Incoming {
+                    title: Some("Fix login".into()),
+                    ..incoming(Signal::Working)
+                },
+                1
+            ),
+            Some(State::Working)
+        );
+        assert_eq!(ledge.snapshot()[0].title.as_deref(), Some("Fix login"));
     }
 
     #[test]

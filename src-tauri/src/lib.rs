@@ -76,6 +76,10 @@ fn ensure_sweeper(app: &AppHandle) {
         }
         if ledge.is_empty() {
             RUNNING.store(false, Ordering::SeqCst);
+            // A dispatch may have arrived between the empty check and releasing ownership.
+            if !ledge.is_empty() {
+                ensure_sweeper(&app);
+            }
             return;
         }
     });
@@ -100,7 +104,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&toggle, &quit])?;
     app.manage(window::TrayToggle(toggle.clone()));
 
-    // macOS keeps the silhouette and discards the colour.
     let icon = Image::from_bytes(include_bytes!("../icons/tray.png"))?;
 
     TrayIconBuilder::new()
@@ -159,6 +162,11 @@ pub fn run() {
             app.manage(ledge);
             app.manage(commands::PopoverState::default());
 
+            ipc::start(handle.clone())?;
+            if !app.state::<Ledge>().is_empty() {
+                ensure_sweeper(&handle);
+            }
+
             if let Some(main) = app.get_webview_window("main") {
                 window::apply_material(&main, 39.0);
                 window::float_over_fullscreen(&main);
@@ -167,9 +175,6 @@ pub fn run() {
                 let _ = main.show();
             }
 
-            if let Err(error) = ipc::start(handle.clone()) {
-                eprintln!("ledge: could not open the hook endpoint: {error}");
-            }
             setup::remove_legacy_codex();
             sync_claude_hook(&handle);
             codex::start(handle.clone());
@@ -183,14 +188,15 @@ pub fn run() {
             // Tauri has no display-change event, so unplugs are caught here.
             WindowEvent::Moved(_) => {
                 window::recenter_if_stranded(window);
-                window::remember_position(window);
                 if window.label() == "main" {
+                    window::remember_position(window);
                     commands::close_popover(window.app_handle().clone(), None);
                 }
             }
             WindowEvent::ScaleFactorChanged { .. } => window::recenter_if_stranded(window),
             WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {
                 api.prevent_close();
+                commands::close_popover(window.app_handle().clone(), None);
                 let _ = window.hide();
                 window::sync_tray_label(window.app_handle());
             }

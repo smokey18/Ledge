@@ -41,10 +41,13 @@ pub fn get_sessions(app: AppHandle) -> Vec<SessionEvent> {
 }
 
 #[tauri::command]
-pub fn get_prefs(app: AppHandle) -> Prefs {
-    Prefs {
-        autostart: app.autolaunch().is_enabled().unwrap_or(false),
-    }
+pub fn get_prefs(app: AppHandle) -> Command<Prefs> {
+    Ok(Prefs {
+        autostart: app
+            .autolaunch()
+            .is_enabled()
+            .map_err(|error| error.to_string())?,
+    })
 }
 
 #[tauri::command]
@@ -56,6 +59,10 @@ pub fn set_agent_count(app: AppHandle, count: usize) {
 
 #[tauri::command]
 pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
+    if !detect::AGENTS.iter().any(|candidate| candidate.id == agent) || !anchor.is_finite() {
+        return Err("invalid agent or anchor".into());
+    }
+
     {
         let state = app.state::<PopoverState>();
         let mut popover = state.0.lock().unwrap();
@@ -80,7 +87,7 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
         .filter(|session| session.agent == agent)
         .count();
 
-    let height = window::popover_height(rows);
+    let height = window::popover_height(rows).min(600.0);
     let label = popover_label(&agent);
     hide_popovers(&app, Some(&label));
 
@@ -88,6 +95,7 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
         let _ = existing.set_size(tauri::LogicalSize::new(window::POPOVER_WIDTH, height));
         place(&app, &label, height);
         let _ = existing.show();
+        let _ = existing.emit("popover-visibility", true);
         let _ = existing.set_focus();
         return Ok(());
     }
@@ -114,6 +122,7 @@ pub fn open_popover(app: AppHandle, agent: String, anchor: f64) -> Command<()> {
     window::float_over_fullscreen(&window);
     place(&app, &label, height);
     let _ = window.show();
+    let _ = window.set_focus();
     Ok(())
 }
 
@@ -124,6 +133,7 @@ fn popover_label(agent: &str) -> String {
 fn hide_popovers(app: &AppHandle, except: Option<&str>) {
     for (label, window) in app.webview_windows() {
         if label.starts_with("popover-") && Some(label.as_str()) != except {
+            let _ = window.emit("popover-visibility", false);
             let _ = window.hide();
         }
     }
@@ -136,8 +146,12 @@ fn place(app: &AppHandle, label: &str, height: f64) {
     ) else {
         return;
     };
-    let Ok(scale) = main.scale_factor() else { return };
-    let Ok(origin) = main.outer_position() else { return };
+    let Ok(scale) = main.scale_factor() else {
+        return;
+    };
+    let Ok(origin) = main.outer_position() else {
+        return;
+    };
 
     let anchor = app.state::<PopoverState>().0.lock().unwrap().anchor;
     let gap = (window::RAIL_WIDTH + window::POPOVER_GAP) * scale;
@@ -157,10 +171,13 @@ fn place(app: &AppHandle, label: &str, height: f64) {
         if x + width > right - 8.0 {
             x = origin.x as f64 - window::POPOVER_GAP * scale - width;
         }
-        x = x.clamp(screen.x as f64 + 8.0, (right - width - 8.0).max(screen.x as f64));
+        x = x.clamp(
+            screen.x as f64 + 8.0,
+            (right - width - 8.0).max(screen.x as f64 + 8.0),
+        );
         y = y.clamp(
             screen.y as f64 + 8.0,
-            (bottom - height * scale - 8.0).max(screen.y as f64),
+            (bottom - height * scale - 8.0).max(screen.y as f64 + 8.0),
         );
     }
 
@@ -169,6 +186,9 @@ fn place(app: &AppHandle, label: &str, height: f64) {
 
 #[tauri::command]
 pub fn size_popover(app: AppHandle, agent: String, height: f64) {
+    if !height.is_finite() || height <= 0.0 {
+        return;
+    }
     let label = popover_label(&agent);
     let open = app.state::<PopoverState>().0.lock().unwrap().open.clone();
     if open.as_deref() != Some(agent.as_str()) {
@@ -224,7 +244,7 @@ pub fn open_project(app: AppHandle, session_id: String) -> Command<()> {
         .filter(|cwd| !cwd.is_empty())
         .ok_or("no directory known for that session")?;
 
-    if !Path::new(&cwd).is_dir() {
+    if !Path::new(&cwd).is_absolute() || !Path::new(&cwd).is_dir() {
         return Err("that directory no longer exists".into());
     }
     app.opener()

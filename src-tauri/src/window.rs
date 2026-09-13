@@ -64,7 +64,6 @@ pub fn float_over_fullscreen(window: &WebviewWindow) {
 #[cfg(not(target_os = "macos"))]
 pub fn float_over_fullscreen(_window: &WebviewWindow) {}
 
-/// Real NSVisualEffectView; CSS can only approximate it.
 pub fn apply_material(window: &WebviewWindow, radius: f64) {
     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
 
@@ -146,7 +145,6 @@ pub fn restore(
     }
 }
 
-/// A display can vanish while the widget sits on it.
 pub fn recenter_if_stranded(window: &Window) {
     let (Ok(scale), Ok(position)) = (window.scale_factor(), window.outer_position()) else {
         return;
@@ -161,6 +159,9 @@ pub fn recenter_if_stranded(window: &Window) {
 }
 
 pub fn remember_position(window: &Window) {
+    if window.label() != "main" {
+        return;
+    }
     let app = window.app_handle().clone();
     let label = window.label().to_string();
 
@@ -201,6 +202,11 @@ pub fn remember_position(window: &Window) {
             }
         }
         ledge.finish_move_watch();
+        if ledge.move_generation() != seen {
+            if let Some(window) = app.get_webview_window(&label) {
+                remember_position(&window.as_ref().window());
+            }
+        }
     });
 }
 
@@ -209,6 +215,7 @@ pub fn toggle_visibility(app: &AppHandle) {
         return;
     };
     if window.is_visible().unwrap_or(false) {
+        crate::commands::close_popover(app.clone(), None);
         let _ = window.hide();
     } else {
         let _ = window.show();
