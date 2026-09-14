@@ -76,16 +76,16 @@ pub fn apply_material(window: &WebviewWindow, radius: f64) {
 }
 
 pub fn rail_size(agents: usize) -> LogicalSize<f64> {
-    const ENDS: f64 = 16.0 + 28.0 + 18.0 + 14.0;
-    const NODE_PADDING: f64 = 20.0 + 26.0;
+    const GAP: f64 = 18.0;
+    const ENDS: f64 = 28.0 + 18.0;
 
     if agents == 0 {
-        return LogicalSize::new(RAIL_WIDTH, ENDS + 18.0);
+        return LogicalSize::new(RAIL_WIDTH, ENDS + GAP * 3.0);
     }
 
     let agents = agents as f64;
-    let nodes = 38.0 * agents + 10.0 * (agents - 1.0);
-    LogicalSize::new(RAIL_WIDTH, ENDS + NODE_PADDING + nodes)
+    let nodes = 38.0 * agents + GAP * (agents - 1.0);
+    LogicalSize::new(RAIL_WIDTH, ENDS + GAP * 4.0 + nodes)
 }
 
 /// Names are absent on some compositors, so geometry backs the key up.
