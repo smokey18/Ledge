@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { mark } from "./marks";
 import { byAgent, SessionEvent, STATE_TEXT, worstOf } from "./session";
 
@@ -80,6 +81,10 @@ orb.addEventListener("click", () => (openAgent ? closePopover() : undefined));
 settingsButton.addEventListener("click", (event) => {
   event.stopPropagation();
   invoke("open_settings").catch(report);
+});
+
+orb.addEventListener("pointerdown", (event) => {
+  if (event.button === 0) getCurrentWindow().startDragging().catch(report);
 });
 
 Object.assign(labels, await invoke<Record<string, string>>("agent_labels"));
