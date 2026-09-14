@@ -14,6 +14,7 @@ use tauri::AppHandle;
 
 const RETRY_INTERVAL: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
+const INACTIVE_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const INITIAL_RECENCY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Default)]
@@ -117,6 +118,7 @@ pub fn start(app: AppHandle) {
             .join("sessions");
         let mut rollouts = HashMap::new();
         let mut first_scan = true;
+        let mut inactive_poll = std::time::Instant::now();
 
         loop {
             if !root.is_dir() {
@@ -160,9 +162,7 @@ pub fn start(app: AppHandle) {
                     match event {
                         Ok(event) => {
                             rescan |= event.need_rescan();
-                            if !event.kind.is_access() {
-                                paths.extend(event.paths);
-                            }
+                            paths.extend(event.paths);
                         }
                         Err(error) => {
                             eprintln!("ledge: Codex watcher failed: {error}");
@@ -177,6 +177,15 @@ pub fn start(app: AppHandle) {
                     paths = files_under(&root).into_iter().collect();
                     rollouts.retain(|path, _| paths.contains(path));
                 }
+                if inactive_poll.elapsed() >= INACTIVE_POLL_INTERVAL {
+                    inactive_poll = std::time::Instant::now();
+                    paths.extend(
+                        rollouts
+                            .iter()
+                            .filter(|(_, rollout)| !rollout.active)
+                            .map(|(path, _)| path.clone()),
+                    );
+                }
                 let mut files = HashSet::new();
                 for path in paths {
                     if path.is_dir() {
@@ -190,7 +199,7 @@ pub fn start(app: AppHandle) {
                 files.extend(
                     rollouts
                         .iter()
-                        .filter(|(_, rollout)| rollout.active)
+                        .filter(|(_, rollout)| rollout.active || !rollout.session_id.is_empty())
                         .map(|(path, _)| path.clone()),
                 );
                 for path in files {
@@ -564,6 +573,55 @@ mod tests {
         )
         .unwrap();
         assert!(read_events(&path, &mut Rollout::default()).is_empty());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn later_turn_in_the_same_rollout_is_reported_again() {
+        let path =
+            std::env::temp_dir().join(format!("ledge-codex-reopen-{}.jsonl", std::process::id()));
+        let mut file = File::create(&path).unwrap();
+        writeln!(
+            file,
+            "{}",
+            json!({"type":"session_meta","payload":{"id":"t-1","cwd":"/tmp","source":"cli"}})
+        )
+        .unwrap();
+        writeln!(
+            file,
+            "{}",
+            json!({"type":"event_msg","payload":{"type":"task_started"}})
+        )
+        .unwrap();
+        let mut rollouts = HashMap::new();
+        assert_eq!(
+            update_rollout(&path, &mut rollouts, false)
+                .into_iter()
+                .map(|event| event.state)
+                .collect::<Vec<_>>(),
+            vec![Signal::Working]
+        );
+
+        writeln!(
+            file,
+            "{}",
+            json!({"type":"event_msg","payload":{"type":"task_complete"}})
+        )
+        .unwrap();
+        assert_eq!(
+            update_rollout(&path, &mut rollouts, false)[0].state,
+            Signal::Completed
+        );
+        writeln!(
+            file,
+            "{}",
+            json!({"type":"event_msg","payload":{"type":"task_started"}})
+        )
+        .unwrap();
+        assert_eq!(
+            update_rollout(&path, &mut rollouts, false)[0].state,
+            Signal::Working
+        );
         let _ = std::fs::remove_file(path);
     }
 }
