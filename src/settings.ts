@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { mark } from "./marks";
 
 interface Integration {
   agent: string;
@@ -21,10 +22,10 @@ function card(integration: Integration): HTMLElement {
   const element = document.createElement("div");
   element.className = "agent";
 
-  const mark = document.createElement("span");
-  mark.className = `agent-mark ${integration.agent}`;
-  mark.textContent = integration.agent === "claude" ? "C" : ">_";
-  mark.setAttribute("aria-hidden", "true");
+  const icon = document.createElement("span");
+  icon.className = "agent-mark";
+  icon.setAttribute("aria-hidden", "true");
+  icon.append(mark(integration.agent, integration.label));
 
   const body = document.createElement("div");
   body.className = "agent-body";
@@ -35,11 +36,11 @@ function card(integration: Integration): HTMLElement {
   head.querySelector(".agent-name")!.textContent = integration.label;
 
   const status = head.querySelector(".status") as HTMLElement;
-  status.textContent = integration.available ? "Detected" : "Not installed";
+  status.textContent = integration.available ? "Connected" : "Disconnected";
   status.classList.toggle("on", integration.available);
 
   body.append(head);
-  element.append(mark, body);
+  element.append(icon, body);
 
   return element;
 }
