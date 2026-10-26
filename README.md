@@ -1,7 +1,7 @@
 # Ledge
 
-A small Mac widget that shows when Claude Code and Codex are working, waiting
-for you, or finished. Works with local sessions only.
+A small Mac widget that shows when Claude Code or Codex is working, waiting
+for you, or finished. It only sees sessions running on your own Mac.
 
 <p align="center">
   <img src="docs/readme/ledge-main.png" alt="Ledge with no active sessions" width="75%">
@@ -9,39 +9,35 @@ for you, or finished. Works with local sessions only.
 
 ## Install
 
-Requires a Mac with Apple silicon (M1 or newer) and macOS 11 or later.
+You need a Mac with Apple silicon (M1 or newer) running macOS 11 or later.
 
-## Install
+Open the **Terminal** app, paste this line and press Return:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/smokey18/Ledge/main/scripts/install.sh | sh
 ```
 
+This puts Ledge in your Applications folder.
+
 <details>
-<summary>Other ways to install</summary>
+<summary>Install without Terminal</summary>
 
-Grab the `.dmg` from the [latest release](../../releases/latest) and drag Ledge
-into Applications. The first launch needs **System Settings → Privacy &
-Security → Open Anyway**.
-
-Or build it: `npm install && npm run tauri build`.
-
-To check a download is genuine:
-
-```sh
-gh attestation verify Ledge_*.dmg --repo smokey18/Ledge
-```
+1. Download the `.dmg` file from the [latest release](../../releases/latest).
+2. Open it and drag Ledge into Applications.
+3. The first time you open Ledge, macOS blocks it because it isn't from the
+   App Store. Go to **System Settings → Privacy & Security** and click
+   **Open Anyway**.
 
 </details>
 
-Open Ledge from Applications before starting your agent.
-
 ## Use
 
-- Click an agent icon to see its sessions.
+Open Ledge before you start Claude Code or Codex, so it can see your sessions.
+
+- Click an agent's icon to see its sessions.
 - Click a session to open its project folder in Finder.
-- Turn on **Open at login** in Settings to start Ledge automatically.
-- Use the menu bar icon to hide, show or quit Ledge.
+- Turn on **Open at login** in Settings, then click **OK** when macOS asks.
+- Use the Ledge icon in the menu bar to hide, show or quit Ledge.
 
 <p align="center">
   <img src="docs/readme/ledge-progress.png" alt="Ledge showing active Codex and Claude Code sessions" width="40%">
@@ -55,6 +51,14 @@ Open Ledge from Applications before starting your agent.
 ## Development
 
 Requires Rust and Node.js 20 or newer.
+
+To check a downloaded `.dmg` is genuine:
+
+```sh
+gh attestation verify Ledge_*.dmg --repo smokey18/Ledge
+```
+
+To run, build and test:
 
 ```sh
 npm install
