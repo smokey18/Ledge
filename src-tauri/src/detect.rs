@@ -5,6 +5,7 @@ pub struct Agent {
     pub label: &'static str,
     pub executable: &'static str,
     pub marker: &'static str,
+    pub app: Option<&'static str>,
 }
 
 pub const AGENTS: &[Agent] = &[
@@ -13,12 +14,14 @@ pub const AGENTS: &[Agent] = &[
         label: "Claude Code",
         executable: "claude",
         marker: ".claude/projects",
+        app: Some("Claude.app"),
     },
     Agent {
         id: "codex",
         label: "Codex",
         executable: "codex",
         marker: ".codex/sessions",
+        app: None,
     },
 ];
 
@@ -58,13 +61,21 @@ fn is_executable(path: &Path) -> bool {
         .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
 }
 
+fn app_installed(bundle: &str) -> bool {
+    [PathBuf::from("/Applications"), home().join("Applications")]
+        .iter()
+        .any(|dir| dir.join(bundle).is_dir())
+}
+
 fn find(agent: &str) -> Option<&'static Agent> {
     AGENTS.iter().find(|candidate| candidate.id == agent)
 }
 
 pub fn is_available(agent: &str) -> bool {
     find(agent).is_some_and(|agent| {
-        on_path(agent.executable).is_some() || home().join(agent.marker).is_dir()
+        on_path(agent.executable).is_some()
+            || home().join(agent.marker).is_dir()
+            || agent.app.is_some_and(app_installed)
     })
 }
 
@@ -104,5 +115,11 @@ mod tests {
     #[test]
     fn unknown_agents_are_never_reported_as_available() {
         assert!(!is_available("emacs-doctor"));
+    }
+
+    #[test]
+    fn an_installed_app_bundle_counts_and_a_missing_one_does_not() {
+        assert!(app_installed("Utilities"));
+        assert!(!app_installed("Definitely Not Installed.app"));
     }
 }
