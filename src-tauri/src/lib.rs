@@ -17,7 +17,7 @@ use tauri::{
     tray::TrayIconBuilder,
     AppHandle, Emitter, Manager, WindowEvent,
 };
-use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 const SWEEP_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -98,6 +98,20 @@ fn sync_claude_hook(app: &AppHandle) {
     }
 }
 
+fn migrate_launch_agent(app: &AppHandle) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    let legacy = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
+        .join("Library/LaunchAgents")
+        .join(format!("{}.plist", app.package_info().name));
+    if std::fs::remove_file(legacy).is_ok() {
+        if let Err(error) = app.autolaunch().enable() {
+            eprintln!("ledge: could not move open at login to a login item: {error}");
+        }
+    }
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let toggle = MenuItem::with_id(app, "toggle", "Hide Ledge", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Ledge", true, None::<&str>)?;
@@ -132,7 +146,7 @@ pub fn run() {
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
+            MacosLauncher::AppleScript,
             None,
         ))
         .invoke_handler(tauri::generate_handler![
@@ -177,6 +191,7 @@ pub fn run() {
 
             setup::remove_legacy_codex();
             sync_claude_hook(&handle);
+            migrate_launch_agent(&handle);
             codex::start(handle.clone());
             build_tray(&handle)?;
             window::sync_tray_label(&handle);
