@@ -1,6 +1,6 @@
 [package]
 name = "ledge"
-version = "0.2.2"
+version = "0.2.4"
 description = "Your agents, at a glance."
 authors = ["smokey18"]
 edition = "2021"
