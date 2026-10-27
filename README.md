@@ -1,12 +1,17 @@
 # Ledge
 
-A small Mac widget that shows when Claude Code or Codex is working, waiting
+A small Mac widget that shows when your coding agents are working, waiting
 for you, or finished.
 
-It works with Claude Code in the terminal, your editor and the Claude desktop
-app's Code tab, and with Codex on your Mac. It can't see regular chats in
-Claude or ChatGPT, Claude Design, or Codex cloud tasks, because those run on
-the provider's servers rather than on your Mac.
+It works with:
+
+- Claude Code in the terminal, your editor and the Claude desktop app's Code tab
+- Codex on your Mac
+- Antigravity (CLI, app and IDE). It shows working and finished, but not
+  waiting, because Antigravity doesn't report when it needs your approval.
+
+It can't see regular chats in Claude or ChatGPT, Claude Design, or Codex cloud
+tasks, because those run on the provider's servers rather than on your Mac.
 
 <p align="center">
   <img src="docs/readme/ledge-main.png" alt="Ledge with no active sessions" width="75%">
@@ -37,7 +42,7 @@ This puts Ledge in your Applications folder.
 
 ## Use
 
-Open Ledge before you start Claude Code or Codex, so it can see your sessions.
+Open Ledge before you start your agent, so it can see your sessions.
 
 - Click an agent's icon to see its sessions.
 - Click a session to open its project folder in Finder.

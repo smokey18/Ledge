@@ -179,6 +179,7 @@ h2 {
 }
 
 .agent-mark .mark { width: 18px; height: 18px; fill: currentColor; }
+.agent-mark .mark.antigravity { fill: #3186ff; }
 .agent-mark .mark.claude { fill: #d97757; }
 
 .agent-body {

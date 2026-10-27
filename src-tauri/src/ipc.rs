@@ -58,7 +58,10 @@ fn parse(buffer: &[u8]) -> Option<(String, serde_json::Value)> {
     let (agent, payload) = buffer.split_at(buffer.iter().position(|byte| *byte == b'\n')?);
     let agent = std::str::from_utf8(agent).ok()?.trim();
 
-    if !matches!(agent, "claude" | "codex" | "codex-notify") {
+    let antigravity = agent
+        .strip_prefix("antigravity:")
+        .is_some_and(|event| crate::antigravity::EVENTS.contains(&event));
+    if !antigravity && !matches!(agent, "claude" | "codex" | "codex-notify") {
         return None;
     }
     Some((
@@ -98,6 +101,9 @@ mod tests {
         assert_eq!(agent, "claude");
         assert_eq!(payload["hook_event_name"], "Stop");
 
+        assert!(parse(b"antigravity:Stop\n{}").is_some());
+        assert!(parse(b"antigravity:Whatever\n{}").is_none());
+        assert!(parse(b"antigravity\n{}").is_none());
         assert!(parse(b"someone-else\n{}").is_none());
         assert!(parse(b"claude\nnot json").is_none());
         assert!(parse(b"no newline").is_none());

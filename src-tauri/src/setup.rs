@@ -1,4 +1,4 @@
-use crate::{claude, codex};
+use crate::{antigravity, claude, codex};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use toml_edit::DocumentMut;
 
 const MARKER: &str = "ledge-hook";
+const HOOK_NAME: &str = "ledge";
 
 fn home() -> PathBuf {
     PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
@@ -13,6 +14,10 @@ fn home() -> PathBuf {
 
 fn hooks_file(agent: &str) -> Option<(PathBuf, &'static [&'static str])> {
     match agent {
+        "antigravity" => Some((
+            home().join(".gemini/config/hooks.json"),
+            antigravity::EVENTS,
+        )),
         "claude" => Some((home().join(".claude/settings.json"), claude::EVENTS)),
         "codex" => Some((home().join(".codex/hooks.json"), codex::EVENTS)),
         _ => None,
@@ -175,6 +180,38 @@ fn drop_hooks(root: &mut Value) {
     }
 }
 
+fn uses_named_hooks(agent: &str) -> bool {
+    agent == "antigravity"
+}
+
+fn add_named_hooks(root: &mut Value, events: &[&str], binary: &str, agent: &str) {
+    let hooks = events
+        .iter()
+        .map(|event| {
+            (
+                event.to_string(),
+                json!([entry(binary, &format!("{agent}:{event}"))]),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+
+    root.as_object_mut()
+        .expect("root is an object")
+        .insert(HOOK_NAME.into(), Value::Object(hooks));
+}
+
+fn drop_named_hooks(root: &mut Value) {
+    let Some(object) = root.as_object_mut() else {
+        return;
+    };
+    if object
+        .get(HOOK_NAME)
+        .is_some_and(|hooks| hooks.to_string().contains(MARKER))
+    {
+        object.remove(HOOK_NAME);
+    }
+}
+
 pub fn connect(agent: &str, binary: &str) -> io::Result<()> {
     let Some((path, events)) = hooks_file(agent) else {
         return Ok(());
@@ -182,8 +219,13 @@ pub fn connect(agent: &str, binary: &str) -> io::Result<()> {
     let mut root = read_json(&path)?;
     backup(&path)?;
     let original = root.clone();
-    drop_hooks(&mut root);
-    add_hooks(&mut root, events, binary, agent);
+    if uses_named_hooks(agent) {
+        drop_named_hooks(&mut root);
+        add_named_hooks(&mut root, events, binary, agent);
+    } else {
+        drop_hooks(&mut root);
+        add_hooks(&mut root, events, binary, agent);
+    }
     if root == original {
         return Ok(());
     }
@@ -196,7 +238,11 @@ pub fn disconnect(agent: &str) -> io::Result<()> {
     };
     let mut root = read_json(&path)?;
     let original = root.clone();
-    drop_hooks(&mut root);
+    if uses_named_hooks(agent) {
+        drop_named_hooks(&mut root);
+    } else {
+        drop_hooks(&mut root);
+    }
 
     if root == original {
         return Ok(());
@@ -390,6 +436,31 @@ mod tests {
         assert!(link.is_symlink());
         assert_eq!(read_json(&path).unwrap(), json!({"model":"opus"}));
         std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[test]
+    fn named_hooks_round_trip_and_never_remove_a_foreign_hook_called_ledge() {
+        let original = json!({
+            "my-linter-hook": {
+                "PostToolUse": [{ "matcher": "run_command", "hooks": [{ "command": "./lint.sh" }] }]
+            }
+        });
+
+        let mut document = original.clone();
+        add_named_hooks(&mut document, antigravity::EVENTS, BINARY, "antigravity");
+        assert_eq!(
+            document[HOOK_NAME]["Stop"][0]["command"],
+            format!("'{BINARY}' antigravity:Stop")
+        );
+        assert!(document[HOOK_NAME]["PreInvocation"][0]["type"] == "command");
+
+        drop_named_hooks(&mut document);
+        assert_eq!(document, original);
+
+        let mut foreign = json!({ "ledge": { "Stop": [{ "command": "./mine.sh" }] } });
+        let before = foreign.clone();
+        drop_named_hooks(&mut foreign);
+        assert_eq!(foreign, before);
     }
 
     #[test]

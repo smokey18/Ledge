@@ -10,6 +10,13 @@ pub struct Agent {
 
 pub const AGENTS: &[Agent] = &[
     Agent {
+        id: "antigravity",
+        label: "Antigravity",
+        executable: "agy",
+        marker: ".gemini/antigravity-cli",
+        app: Some("Antigravity.app"),
+    },
+    Agent {
         id: "claude",
         label: "Claude Code",
         executable: "claude",
@@ -90,6 +97,8 @@ mod tests {
 
         let codex = find("codex").unwrap();
         assert_ne!(codex.marker, ".codex");
+        let antigravity = find("antigravity").unwrap();
+        assert!(!".gemini/config/hooks.json".starts_with(antigravity.marker));
 
         std::fs::create_dir_all(scratch.join(".codex")).unwrap();
         assert!(!scratch.join(codex.marker).is_dir());
@@ -98,6 +107,14 @@ mod tests {
         assert!(scratch.join(codex.marker).is_dir());
 
         let _ = std::fs::remove_dir_all(&scratch);
+    }
+
+    #[test]
+    fn agents_are_listed_alphabetically() {
+        let ids: Vec<_> = AGENTS.iter().map(|agent| agent.id).collect();
+        let mut sorted = ids.clone();
+        sorted.sort();
+        assert_eq!(ids, sorted);
     }
 
     #[test]

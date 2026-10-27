@@ -1,3 +1,4 @@
+mod antigravity;
 mod claude;
 mod codex;
 mod commands;
@@ -33,7 +34,9 @@ pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
         "claude" => claude::map(&payload),
         "codex" => codex::map(&payload),
         "codex-notify" => codex::map_notify(&payload),
-        _ => None,
+        _ => agent
+            .strip_prefix("antigravity:")
+            .and_then(|event| antigravity::map(event, &payload)),
     };
     let Some(incoming) = incoming else { return };
     dispatch_incoming(app, incoming);
@@ -85,16 +88,17 @@ fn ensure_sweeper(app: &AppHandle) {
     });
 }
 
-fn sync_claude_hook(app: &AppHandle) {
-    if !detect::is_available("claude") {
-        return;
-    }
+const HOOKED: &[&str] = &["antigravity", "claude"];
+
+fn sync_hooks(app: &AppHandle) {
     let Some(binary) = ipc::hook_binary_path(app) else {
         eprintln!("ledge: the ledge-hook binary is missing");
         return;
     };
-    if let Err(error) = setup::connect("claude", &binary) {
-        eprintln!("ledge: could not connect Claude Code: {error}");
+    for agent in HOOKED.iter().filter(|agent| detect::is_available(agent)) {
+        if let Err(error) = setup::connect(agent, &binary) {
+            eprintln!("ledge: could not connect {agent}: {error}");
+        }
     }
 }
 
@@ -129,7 +133,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "toggle" => window::toggle_visibility(app),
             "quit" => {
                 app.state::<Ledge>().save(app);
-                let _ = setup::disconnect("claude");
+                for agent in HOOKED {
+                    let _ = setup::disconnect(agent);
+                }
                 ipc::cleanup();
                 app.exit(0);
             }
@@ -190,7 +196,7 @@ pub fn run() {
             }
 
             setup::remove_legacy_codex();
-            sync_claude_hook(&handle);
+            sync_hooks(&handle);
             migrate_launch_agent(&handle);
             codex::start(handle.clone());
             build_tray(&handle)?;
