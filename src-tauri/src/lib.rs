@@ -5,6 +5,7 @@ mod commands;
 mod cursor;
 mod detect;
 mod ipc;
+mod opencode;
 mod setup;
 mod state;
 mod window;
@@ -36,6 +37,7 @@ pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
         "codex" => codex::map(&payload),
         "codex-notify" => codex::map_notify(&payload),
         "cursor" => cursor::map(&payload),
+        "opencode" => opencode::map(&payload),
         _ => agent
             .strip_prefix("antigravity:")
             .and_then(|event| antigravity::map(event, &payload)),
@@ -92,7 +94,7 @@ fn ensure_sweeper(app: &AppHandle) {
     });
 }
 
-const HOOKED: &[&str] = &["antigravity", "claude", "cursor"];
+const HOOKED: &[&str] = &["antigravity", "claude", "cursor", "opencode"];
 
 fn sync_hooks(app: &AppHandle) {
     let Some(binary) = ipc::hook_binary_path(app) else {

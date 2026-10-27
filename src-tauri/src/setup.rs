@@ -1,4 +1,4 @@
-use crate::{antigravity, claude, codex, cursor};
+use crate::{antigravity, claude, codex, cursor, opencode};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -22,6 +22,26 @@ fn hooks_file(agent: &str) -> Option<(PathBuf, &'static [&'static str])> {
         "codex" => Some((home().join(".codex/hooks.json"), codex::EVENTS)),
         "cursor" => Some((home().join(".cursor/hooks.json"), cursor::EVENTS)),
         _ => None,
+    }
+}
+
+fn opencode_plugin() -> PathBuf {
+    home().join(".config/opencode/plugins/ledge.js")
+}
+
+fn install_plugin(path: &Path, contents: &str) -> io::Result<()> {
+    if std::fs::read_to_string(path).is_ok_and(|raw| raw == contents) {
+        return Ok(());
+    }
+    write_atomic(path, contents.as_bytes())
+}
+
+fn remove_plugin(path: &Path) -> io::Result<()> {
+    match std::fs::read_to_string(path) {
+        Ok(raw) if raw.contains("LedgePlugin") => std::fs::remove_file(path),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
     }
 }
 
@@ -225,6 +245,9 @@ fn drop_named_hooks(root: &mut Value) {
 }
 
 pub fn connect(agent: &str, binary: &str) -> io::Result<()> {
+    if agent == "opencode" {
+        return install_plugin(&opencode_plugin(), opencode::PLUGIN);
+    }
     let Some((path, events)) = hooks_file(agent) else {
         return Ok(());
     };
@@ -245,6 +268,9 @@ pub fn connect(agent: &str, binary: &str) -> io::Result<()> {
 }
 
 pub fn disconnect(agent: &str) -> io::Result<()> {
+    if agent == "opencode" {
+        return remove_plugin(&opencode_plugin());
+    }
     let Some((path, _)) = hooks_file(agent).filter(|(path, _)| path.exists()) else {
         return Ok(());
     };
@@ -447,6 +473,27 @@ mod tests {
         write_json(&link, &json!({"model":"opus"})).unwrap();
         assert!(link.is_symlink());
         assert_eq!(read_json(&path).unwrap(), json!({"model":"opus"}));
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[test]
+    fn the_plugin_is_written_once_and_only_ledges_own_file_is_removed() {
+        let scratch = std::env::temp_dir().join(format!("ledge-plugin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&scratch);
+        let path = scratch.join("plugins/ledge.js");
+
+        install_plugin(&path, opencode::PLUGIN).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), opencode::PLUGIN);
+        install_plugin(&path, opencode::PLUGIN).unwrap();
+
+        remove_plugin(&path).unwrap();
+        assert!(!path.exists());
+        remove_plugin(&path).unwrap();
+
+        std::fs::write(&path, "export const Mine = async () => ({})").unwrap();
+        remove_plugin(&path).unwrap();
+        assert!(path.exists());
+
         std::fs::remove_dir_all(scratch).unwrap();
     }
 

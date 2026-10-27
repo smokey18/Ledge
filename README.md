@@ -9,6 +9,7 @@ It works with:
 - Codex on your Mac
 - Antigravity (CLI, app and IDE)
 - Cursor (CLI and app)
+- OpenCode
 
 For Antigravity and Cursor, Ledge shows working and finished, but not
 waiting, because they don't report when they need your approval.

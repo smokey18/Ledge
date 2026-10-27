@@ -37,6 +37,13 @@ pub const AGENTS: &[Agent] = &[
         marker: ".cursor/projects",
         app: Some("Cursor.app"),
     },
+    Agent {
+        id: "opencode",
+        label: "OpenCode",
+        executable: "opencode",
+        marker: ".local/share/opencode",
+        app: Some("OpenCode.app"),
+    },
 ];
 
 fn home() -> PathBuf {
@@ -107,6 +114,7 @@ mod tests {
         let antigravity = find("antigravity").unwrap();
         assert!(!".gemini/config/hooks.json".starts_with(antigravity.marker));
         assert_ne!(find("cursor").unwrap().marker, ".cursor");
+        assert!(!".config/opencode/plugins/ledge.js".starts_with(find("opencode").unwrap().marker));
 
         std::fs::create_dir_all(scratch.join(".codex")).unwrap();
         assert!(!scratch.join(codex.marker).is_dir());
