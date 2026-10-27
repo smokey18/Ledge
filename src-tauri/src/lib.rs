@@ -24,6 +24,10 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 const SWEEP_INTERVAL: Duration = Duration::from_secs(10);
 
+pub fn home() -> std::path::PathBuf {
+    std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
+}
+
 pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -34,8 +38,6 @@ pub fn now_ms() -> i64 {
 pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
     let incoming = match agent {
         "claude" => claude::map(&payload),
-        "codex" => codex::map(&payload),
-        "codex-notify" => codex::map_notify(&payload),
         "cursor" => cursor::map(&payload),
         "opencode" => opencode::map(&payload),
         _ => agent
@@ -94,9 +96,9 @@ fn ensure_sweeper(app: &AppHandle) {
     });
 }
 
-const HOOKED: &[&str] = &["antigravity", "claude", "cursor", "opencode"];
+pub(crate) const HOOKED: &[&str] = &["antigravity", "claude", "cursor", "opencode"];
 
-fn sync_hooks(app: &AppHandle) {
+pub(crate) fn sync_hooks(app: &AppHandle) {
     let Some(binary) = ipc::hook_binary_path(app) else {
         eprintln!("ledge: the ledge-hook binary is missing");
         return;
@@ -112,7 +114,7 @@ fn migrate_launch_agent(app: &AppHandle) {
     if cfg!(debug_assertions) {
         return;
     }
-    let legacy = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
+    let legacy = home()
         .join("Library/LaunchAgents")
         .join(format!("{}.plist", app.package_info().name));
     if std::fs::remove_file(legacy).is_ok() {

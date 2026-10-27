@@ -1,4 +1,4 @@
-//! Verified against Claude Code 2.1.268.
+//! Verified against Claude Code 2.1.311.
 
 use crate::state::{Incoming, Signal};
 use serde_json::Value;
@@ -14,6 +14,14 @@ pub const EVENTS: &[&str] = &[
     "SessionEnd",
 ];
 
+const WAITING_NOTIFICATIONS: &[&str] = &[
+    "agent_needs_input",
+    "elicitation_dialog",
+    "elicitation_url_dialog",
+    "permission_prompt",
+    "worker_permission_prompt",
+];
+
 pub fn map(payload: &Value) -> Option<Incoming> {
     let event = payload.get("hook_event_name")?.as_str()?;
     let session_id = payload.get("session_id")?.as_str()?.to_string();
@@ -26,7 +34,14 @@ pub fn map(payload: &Value) -> Option<Incoming> {
 
     let state = match event {
         "UserPromptSubmit" | "PreToolUse" | "PostToolUse" => Signal::Working,
-        "PermissionRequest" | "Notification" => Signal::Waiting,
+        "PermissionRequest" => Signal::Waiting,
+        "Notification" => {
+            let kind = payload.get("notification_type").and_then(Value::as_str)?;
+            if !WAITING_NOTIFICATIONS.contains(&kind) {
+                return None;
+            }
+            Signal::Waiting
+        }
         "Stop" => Signal::Completed,
         "StopFailure" | "SessionEnd" => Signal::Ended,
         _ => return None,
@@ -90,6 +105,25 @@ mod tests {
         assert_eq!(map(&ev("StopFailure")).unwrap().state, Signal::Ended);
         assert_eq!(map(&ev("SessionEnd")).unwrap().state, Signal::Ended);
         assert_eq!(map(&ev("PreToolUse")).unwrap().project_name, "mendmyhouse");
+    }
+
+    #[test]
+    fn only_notifications_that_need_the_user_mean_waiting() {
+        for kind in [
+            "permission_prompt",
+            "elicitation_dialog",
+            "worker_permission_prompt",
+        ] {
+            let mut e = ev("Notification");
+            e["notification_type"] = json!(kind);
+            assert_eq!(map(&e).unwrap().state, Signal::Waiting);
+        }
+        for kind in ["idle_prompt", "auth_success", "agent_completed"] {
+            let mut e = ev("Notification");
+            e["notification_type"] = json!(kind);
+            assert!(map(&e).is_none());
+        }
+        assert!(map(&ev("Notification")).is_none());
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::{antigravity, claude, codex, cursor, opencode};
+use crate::{antigravity, claude, cursor, home, opencode};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -7,10 +7,7 @@ use toml_edit::DocumentMut;
 
 const MARKER: &str = "ledge-hook";
 const HOOK_NAME: &str = "ledge";
-
-fn home() -> PathBuf {
-    PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
-}
+const PLUGIN_MARKER: &str = "LedgePlugin";
 
 fn hooks_file(agent: &str) -> Option<(PathBuf, &'static [&'static str])> {
     match agent {
@@ -19,7 +16,7 @@ fn hooks_file(agent: &str) -> Option<(PathBuf, &'static [&'static str])> {
             antigravity::EVENTS,
         )),
         "claude" => Some((home().join(".claude/settings.json"), claude::EVENTS)),
-        "codex" => Some((home().join(".codex/hooks.json"), codex::EVENTS)),
+        "codex" => Some((home().join(".codex/hooks.json"), &[])),
         "cursor" => Some((home().join(".cursor/hooks.json"), cursor::EVENTS)),
         _ => None,
     }
@@ -30,7 +27,9 @@ fn opencode_plugin() -> PathBuf {
 }
 
 fn install_plugin(path: &Path, contents: &str) -> io::Result<()> {
-    if std::fs::read_to_string(path).is_ok_and(|raw| raw == contents) {
+    if std::fs::read_to_string(path)
+        .is_ok_and(|raw| raw == contents || !raw.contains(PLUGIN_MARKER))
+    {
         return Ok(());
     }
     write_atomic(path, contents.as_bytes())
@@ -38,7 +37,7 @@ fn install_plugin(path: &Path, contents: &str) -> io::Result<()> {
 
 fn remove_plugin(path: &Path) -> io::Result<()> {
     match std::fs::read_to_string(path) {
-        Ok(raw) if raw.contains("LedgePlugin") => std::fs::remove_file(path),
+        Ok(raw) if raw.contains(PLUGIN_MARKER) => std::fs::remove_file(path),
         Ok(_) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error),
@@ -229,7 +228,8 @@ fn add_named_hooks(root: &mut Value, events: &[&str], binary: &str, agent: &str)
 
     root.as_object_mut()
         .expect("root is an object")
-        .insert(HOOK_NAME.into(), Value::Object(hooks));
+        .entry(HOOK_NAME)
+        .or_insert(Value::Object(hooks));
 }
 
 fn drop_named_hooks(root: &mut Value) {
@@ -289,9 +289,14 @@ pub fn disconnect(agent: &str) -> io::Result<()> {
 }
 
 pub fn is_connected(agent: &str) -> bool {
-    hooks_file(agent).is_some_and(|(path, _)| {
-        std::fs::read_to_string(path).is_ok_and(|raw| raw.contains(MARKER))
-    })
+    let (path, marker) = match agent {
+        "opencode" => (opencode_plugin(), PLUGIN_MARKER),
+        _ => match hooks_file(agent) {
+            Some((path, _)) => (path, MARKER),
+            None => return false,
+        },
+    };
+    std::fs::read_to_string(path).is_ok_and(|raw| raw.contains(marker))
 }
 
 pub fn remove_legacy_codex() {
@@ -477,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn the_plugin_is_written_once_and_only_ledges_own_file_is_removed() {
+    fn the_plugin_is_written_once_and_only_ledges_own_file_is_replaced_or_removed() {
         let scratch = std::env::temp_dir().join(format!("ledge-plugin-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&scratch);
         let path = scratch.join("plugins/ledge.js");
@@ -490,9 +495,11 @@ mod tests {
         assert!(!path.exists());
         remove_plugin(&path).unwrap();
 
-        std::fs::write(&path, "export const Mine = async () => ({})").unwrap();
+        let mine = "export const Mine = async () => ({})";
+        std::fs::write(&path, mine).unwrap();
+        install_plugin(&path, opencode::PLUGIN).unwrap();
         remove_plugin(&path).unwrap();
-        assert!(path.exists());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), mine);
 
         std::fs::remove_dir_all(scratch).unwrap();
     }
@@ -520,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn named_hooks_round_trip_and_never_remove_a_foreign_hook_called_ledge() {
+    fn named_hooks_round_trip_and_never_replace_or_remove_a_foreign_hook_called_ledge() {
         let original = json!({
             "my-linter-hook": {
                 "PostToolUse": [{ "matcher": "run_command", "hooks": [{ "command": "./lint.sh" }] }]
@@ -541,6 +548,7 @@ mod tests {
         let mut foreign = json!({ "ledge": { "Stop": [{ "command": "./mine.sh" }] } });
         let before = foreign.clone();
         drop_named_hooks(&mut foreign);
+        add_named_hooks(&mut foreign, antigravity::EVENTS, BINARY, "antigravity");
         assert_eq!(foreign, before);
     }
 

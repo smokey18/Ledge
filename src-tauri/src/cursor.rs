@@ -3,8 +3,6 @@ use serde_json::Value;
 
 pub const EVENTS: &[&str] = &["beforeSubmitPrompt", "postToolUse", "stop"];
 
-const TITLE_MAX: usize = 80;
-
 pub fn map(payload: &Value) -> Option<Incoming> {
     let event = payload.get("hook_event_name")?.as_str()?;
     let session_id = payload.get("conversation_id")?.as_str()?.to_string();
@@ -27,8 +25,7 @@ pub fn map(payload: &Value) -> Option<Incoming> {
     let title = (event == "beforeSubmitPrompt")
         .then(|| payload.get("prompt")?.as_str())
         .flatten()
-        .and_then(|prompt| prompt.lines().find(|line| !line.trim().is_empty()))
-        .map(|line| line.trim().chars().take(TITLE_MAX).collect());
+        .and_then(crate::state::first_line_title);
 
     Some(Incoming {
         session_id,
@@ -88,7 +85,10 @@ mod tests {
         assert_eq!(map(&e).unwrap().title.as_deref(), Some("fix the login bug"));
 
         e["prompt"] = json!("x".repeat(200));
-        assert_eq!(map(&e).unwrap().title.unwrap().chars().count(), TITLE_MAX);
+        assert_eq!(
+            map(&e).unwrap().title.unwrap().chars().count(),
+            crate::state::TITLE_MAX
+        );
 
         let mut tool = ev("postToolUse");
         tool["prompt"] = json!("not a prompt event");

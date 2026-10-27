@@ -1,5 +1,5 @@
 use crate::state::{Ledge, SessionEvent};
-use crate::{detect, window};
+use crate::{detect, setup, window};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -15,7 +15,7 @@ type Command<T> = Result<T, String>;
 pub struct Integration {
     agent: &'static str,
     label: &'static str,
-    available: bool,
+    connected: bool,
 }
 
 #[derive(Serialize)]
@@ -282,13 +282,18 @@ pub fn open_settings(app: AppHandle) -> Command<()> {
 }
 
 #[tauri::command]
-pub fn integrations() -> Vec<Integration> {
+pub fn integrations(app: AppHandle) -> Vec<Integration> {
+    crate::sync_hooks(&app);
     detect::AGENTS
         .iter()
         .map(|agent| Integration {
             agent: agent.id,
             label: agent.label,
-            available: detect::is_available(agent.id),
+            connected: if crate::HOOKED.contains(&agent.id) {
+                setup::is_connected(agent.id)
+            } else {
+                detect::is_available(agent.id)
+            },
         })
         .collect()
 }

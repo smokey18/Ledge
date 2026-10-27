@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
-const MAX_PAYLOAD: u64 = 64 * 1024;
+const MAX_PAYLOAD_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_AGENT_LINE_BYTES: u64 = 64;
 const READ_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub fn socket_path() -> PathBuf {
@@ -15,7 +16,7 @@ pub fn socket_path() -> PathBuf {
 }
 
 fn dirs_ledge() -> PathBuf {
-    PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".ledge")
+    crate::home().join(".ledge")
 }
 
 pub fn start(app: AppHandle) -> std::io::Result<()> {
@@ -39,7 +40,7 @@ pub fn start(app: AppHandle) -> std::io::Result<()> {
             let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
 
             let mut buffer = Vec::new();
-            if Read::take(&mut stream, MAX_PAYLOAD)
+            if Read::take(&mut stream, MAX_PAYLOAD_BYTES + MAX_AGENT_LINE_BYTES)
                 .read_to_end(&mut buffer)
                 .is_err()
             {
@@ -61,12 +62,7 @@ fn parse(buffer: &[u8]) -> Option<(String, serde_json::Value)> {
     let antigravity = agent
         .strip_prefix("antigravity:")
         .is_some_and(|event| crate::antigravity::EVENTS.contains(&event));
-    if !antigravity
-        && !matches!(
-            agent,
-            "claude" | "codex" | "codex-notify" | "cursor" | "opencode"
-        )
-    {
+    if !antigravity && !matches!(agent, "claude" | "cursor" | "opencode") {
         return None;
     }
     Some((
@@ -112,6 +108,7 @@ mod tests {
         assert!(parse(b"antigravity:Whatever\n{}").is_none());
         assert!(parse(b"antigravity\n{}").is_none());
         assert!(parse(b"someone-else\n{}").is_none());
+        assert!(parse(b"codex\n{}").is_none());
         assert!(parse(b"claude\nnot json").is_none());
         assert!(parse(b"no newline").is_none());
     }

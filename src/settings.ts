@@ -4,7 +4,7 @@ import { mark } from "./marks";
 interface Integration {
   agent: string;
   label: string;
-  available: boolean;
+  connected: boolean;
 }
 
 interface Prefs {
@@ -36,8 +36,8 @@ function card(integration: Integration): HTMLElement {
   head.querySelector(".agent-name")!.textContent = integration.label;
 
   const status = head.querySelector(".status") as HTMLElement;
-  status.textContent = integration.available ? "Connected" : "Disconnected";
-  status.classList.toggle("on", integration.available);
+  status.textContent = integration.connected ? "Connected" : "Disconnected";
+  status.classList.toggle("on", integration.connected);
 
   body.append(head);
   element.append(icon, body);

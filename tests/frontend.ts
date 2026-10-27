@@ -65,7 +65,7 @@ mockIPC(
       return { autostart: false };
     }
     if (command === "integrations") {
-      return [{ agent: "codex", label: "Codex", available: true }];
+      return [{ agent: "codex", label: "Codex", connected: true }];
     }
     if (command === "set_autostart") {
       throw new Error("simulated failure");

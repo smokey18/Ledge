@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager};
 pub const STALE_MS: i64 = 10 * 60 * 1000;
 const FORGET_MS: i64 = 60 * 1000;
 const FORGET_FAILED_MS: i64 = 10 * 60 * 1000;
+pub const TITLE_MAX: usize = 80;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -85,6 +86,11 @@ pub fn project_name(cwd: &str) -> String {
         .map(|name| name.to_string_lossy().into_owned())
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "unknown".into())
+}
+
+pub fn first_line_title(text: &str) -> Option<String> {
+    let line = text.lines().find(|line| !line.trim().is_empty())?.trim();
+    Some(line.chars().take(TITLE_MAX).collect())
 }
 
 fn settings_path(app: &AppHandle) -> PathBuf {

@@ -27,8 +27,6 @@ struct Rollout {
     active: bool,
     title: Option<String>,
 }
-const TITLE_MAX: usize = 80;
-
 fn prompt_title(value: &Value) -> Option<String> {
     let payload = value.get("payload")?;
     if payload.get("role")?.as_str()? != "user" {
@@ -41,80 +39,14 @@ fn prompt_title(value: &Value) -> Option<String> {
         .iter()
         .find_map(|part| part.get("text")?.as_str())?;
 
-    let line = text.lines().find(|line| !line.trim().is_empty())?.trim();
-    if line.starts_with('<') || line.starts_with('#') {
-        return None;
-    }
-
-    Some(line.chars().take(TITLE_MAX).collect())
-}
-
-pub const EVENTS: &[&str] = &[
-    "UserPromptSubmit",
-    "PreToolUse",
-    "PostToolUse",
-    "PermissionRequest",
-    "Stop",
-    "SessionEnd",
-];
-
-pub fn map(payload: &Value) -> Option<Incoming> {
-    let event = payload
-        .get("hook_event_name")
-        .or_else(|| payload.get("event_name"))?
-        .as_str()?;
-    let session_id = payload
-        .get("session_id")
-        .or_else(|| payload.get("thread_id"))?
-        .as_str()?
-        .to_string();
-    let cwd = payload.get("cwd").and_then(Value::as_str).unwrap_or("");
-
-    let state = match event {
-        "UserPromptSubmit" | "PreToolUse" | "PostToolUse" => Signal::Working,
-        "PermissionRequest" => Signal::Waiting,
-        "Stop" => Signal::Completed,
-        // Not `completed`: this fires when the session closes, not the turn.
-        "SessionEnd" => Signal::Ended,
-        _ => return None,
-    };
-
-    Some(Incoming {
-        session_id,
-        agent: "codex".into(),
-        project_name: crate::state::project_name(cwd),
-        cwd: cwd.to_string(),
-        state,
-        transcript: None,
-        title: None,
-    })
-}
-
-pub fn map_notify(payload: &Value) -> Option<Incoming> {
-    if payload.get("type")?.as_str()? != "agent-turn-complete" {
-        return None;
-    }
-    let session_id = payload.get("thread-id")?.as_str()?.to_string();
-    let cwd = payload.get("cwd").and_then(Value::as_str).unwrap_or("");
-
-    Some(Incoming {
-        session_id,
-        agent: "codex".into(),
-        project_name: crate::state::project_name(cwd),
-        cwd: cwd.to_string(),
-        state: Signal::Completed,
-        transcript: None,
-        title: None,
-    })
+    crate::state::first_line_title(text).filter(|title| !title.starts_with(['<', '#']))
 }
 
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
         let root = std::env::var_os("CODEX_HOME")
             .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".codex")
-            })
+            .unwrap_or_else(|| crate::home().join(".codex"))
             .join("sessions");
         let mut rollouts = HashMap::new();
         let mut first_scan = true;
@@ -379,7 +311,7 @@ fn read_events(path: &Path, rollout: &mut Rollout) -> Vec<Incoming> {
                 }
                 Some("turn_aborted") => {
                     rollout.active = false;
-                    push(&mut events, rollout, Signal::Ended);
+                    push(&mut events, rollout, Signal::Completed);
                 }
                 _ => {}
             },
@@ -433,56 +365,11 @@ mod tests {
                 .unwrap()
                 .chars()
                 .count(),
-            TITLE_MAX
+            crate::state::TITLE_MAX
         );
     }
     use serde_json::json;
     use std::io::Write;
-
-    fn ev(name: &str) -> Value {
-        json!({
-            "hook_event_name": name,
-            "session_id": "t-1",
-            "cwd": "/Users/x/Herd/smartshifts"
-        })
-    }
-
-    #[test]
-    fn maps_codex_events() {
-        assert!(map(&ev("SessionStart")).is_none());
-        assert_eq!(map(&ev("PreToolUse")).unwrap().state, Signal::Working);
-        assert_eq!(
-            map(&ev("PermissionRequest")).unwrap().state,
-            Signal::Waiting
-        );
-        assert_eq!(map(&ev("Stop")).unwrap().state, Signal::Completed);
-        assert_eq!(map(&ev("SessionEnd")).unwrap().state, Signal::Ended);
-        assert_eq!(map(&ev("PreToolUse")).unwrap().project_name, "smartshifts");
-    }
-
-    #[test]
-    fn session_end_is_never_read_as_completion() {
-        assert_ne!(map(&ev("SessionEnd")).unwrap().state, Signal::Completed);
-    }
-
-    #[test]
-    fn notify_uses_hyphenated_keys_and_only_fires_on_turn_complete() {
-        let payload = json!({
-            "type": "agent-turn-complete",
-            "thread-id": "t-1",
-            "turn-id": "u-1",
-            "cwd": "/Users/x/Herd/smartshifts",
-            "last-assistant-message": "done"
-        });
-        let got = map_notify(&payload).unwrap();
-        assert_eq!(got.state, Signal::Completed);
-        assert_eq!(got.session_id, "t-1");
-        assert_eq!(got.project_name, "smartshifts");
-
-        let other = json!({"type": "something-else", "thread-id": "t-1"});
-        assert!(map_notify(&other).is_none());
-        assert!(map_notify(&json!({})).is_none());
-    }
 
     #[test]
     fn native_watcher_reports_new_nested_rollouts() {
@@ -621,6 +508,16 @@ mod tests {
         assert_eq!(
             update_rollout(&path, &mut rollouts, false)[0].state,
             Signal::Working
+        );
+        writeln!(
+            file,
+            "{}",
+            json!({"type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}})
+        )
+        .unwrap();
+        assert_eq!(
+            update_rollout(&path, &mut rollouts, false)[0].state,
+            Signal::Completed
         );
         let _ = std::fs::remove_file(path);
     }

@@ -1,3 +1,4 @@
+use crate::home;
 use std::path::{Path, PathBuf};
 
 pub struct Agent {
@@ -45,10 +46,6 @@ pub const AGENTS: &[Agent] = &[
         app: Some("OpenCode.app"),
     },
 ];
-
-fn home() -> PathBuf {
-    PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
-}
 
 const EXTRA_BIN_DIRS: &[&str] = &[
     "/opt/homebrew/bin",
