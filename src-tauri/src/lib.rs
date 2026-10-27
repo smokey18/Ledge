@@ -2,6 +2,7 @@ mod antigravity;
 mod claude;
 mod codex;
 mod commands;
+mod cursor;
 mod detect;
 mod ipc;
 mod setup;
@@ -34,6 +35,7 @@ pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
         "claude" => claude::map(&payload),
         "codex" => codex::map(&payload),
         "codex-notify" => codex::map_notify(&payload),
+        "cursor" => cursor::map(&payload),
         _ => agent
             .strip_prefix("antigravity:")
             .and_then(|event| antigravity::map(event, &payload)),
@@ -45,7 +47,9 @@ pub fn dispatch(app: &AppHandle, agent: &str, payload: Value) {
 pub fn dispatch_incoming(app: &AppHandle, mut incoming: state::Incoming) {
     let ledge = app.state::<Ledge>();
 
-    if incoming.title.is_none() && ledge.needs_title(&incoming.session_id) {
+    if !ledge.needs_title(&incoming.session_id) {
+        incoming.title = None;
+    } else if incoming.title.is_none() {
         incoming.title = incoming.transcript.as_deref().and_then(claude::title_from);
     }
 
@@ -88,7 +92,7 @@ fn ensure_sweeper(app: &AppHandle) {
     });
 }
 
-const HOOKED: &[&str] = &["antigravity", "claude"];
+const HOOKED: &[&str] = &["antigravity", "claude", "cursor"];
 
 fn sync_hooks(app: &AppHandle) {
     let Some(binary) = ipc::hook_binary_path(app) else {

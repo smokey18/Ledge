@@ -61,7 +61,7 @@ fn parse(buffer: &[u8]) -> Option<(String, serde_json::Value)> {
     let antigravity = agent
         .strip_prefix("antigravity:")
         .is_some_and(|event| crate::antigravity::EVENTS.contains(&event));
-    if !antigravity && !matches!(agent, "claude" | "codex" | "codex-notify") {
+    if !antigravity && !matches!(agent, "claude" | "codex" | "codex-notify" | "cursor") {
         return None;
     }
     Some((
@@ -101,6 +101,7 @@ mod tests {
         assert_eq!(agent, "claude");
         assert_eq!(payload["hook_event_name"], "Stop");
 
+        assert!(parse(b"cursor\n{}").is_some());
         assert!(parse(b"antigravity:Stop\n{}").is_some());
         assert!(parse(b"antigravity:Whatever\n{}").is_none());
         assert!(parse(b"antigravity\n{}").is_none());

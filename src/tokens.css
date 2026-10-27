@@ -92,6 +92,7 @@ button {
 .mark.antigravity { fill: #3186ff; }
 .mark.claude { fill: #d97757; }
 .mark.codex { fill: var(--ink); }
+.mark.cursor { fill: var(--ink); }
 
 .mark.initial {
   display: grid;

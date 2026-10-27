@@ -7,8 +7,11 @@ It works with:
 
 - Claude Code in the terminal, your editor and the Claude desktop app's Code tab
 - Codex on your Mac
-- Antigravity (CLI, app and IDE). It shows working and finished, but not
-  waiting, because Antigravity doesn't report when it needs your approval.
+- Antigravity (CLI, app and IDE)
+- Cursor (CLI and app)
+
+For Antigravity and Cursor, Ledge shows working and finished, but not
+waiting, because they don't report when they need your approval.
 
 It can't see regular chats in Claude or ChatGPT, Claude Design, or Codex cloud
 tasks, because those run on the provider's servers rather than on your Mac.

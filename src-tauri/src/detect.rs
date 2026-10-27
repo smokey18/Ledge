@@ -30,6 +30,13 @@ pub const AGENTS: &[Agent] = &[
         marker: ".codex/sessions",
         app: None,
     },
+    Agent {
+        id: "cursor",
+        label: "Cursor",
+        executable: "cursor-agent",
+        marker: ".cursor/projects",
+        app: Some("Cursor.app"),
+    },
 ];
 
 fn home() -> PathBuf {
@@ -99,6 +106,7 @@ mod tests {
         assert_ne!(codex.marker, ".codex");
         let antigravity = find("antigravity").unwrap();
         assert!(!".gemini/config/hooks.json".starts_with(antigravity.marker));
+        assert_ne!(find("cursor").unwrap().marker, ".cursor");
 
         std::fs::create_dir_all(scratch.join(".codex")).unwrap();
         assert!(!scratch.join(codex.marker).is_dir());

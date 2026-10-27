@@ -16,7 +16,7 @@ A small macOS widget that shows when local coding agents are working, waiting fo
 - `src-tauri/src/lib.rs`: app setup, event dispatch, sweeper, tray, hook sync (`HOOKED`), login item migration.
 - `src-tauri/src/detect.rs`: `AGENTS` list (id, label, executable, marker dir, optional `.app`).
 - `src-tauri/src/setup.rs`: adds and removes Ledge's hook entries in agent config files.
-- `src-tauri/src/claude.rs`, `antigravity.rs`: map hook payloads to `state::Incoming`.
+- `src-tauri/src/antigravity.rs`, `claude.rs`, `cursor.rs`: map hook payloads to `state::Incoming`.
 - `src-tauri/src/codex.rs`: watches `~/.codex/sessions` rollouts; no hooks.
 - `src-tauri/src/state.rs`: session store, states, staleness sweep, persistence.
 - `src-tauri/src/ipc.rs`: Unix socket at `~/.ledge/hook.sock`; accepted agent names are whitelisted in `parse`.
@@ -36,7 +36,8 @@ A small macOS widget that shows when local coding agents are working, waiting fo
 
 - Only agents running on the Mac can be tracked. Chats in Claude or ChatGPT, Claude Design and cloud tasks can't.
 - Antigravity: hooks live in `~/.gemini/config/hooks.json` (shared by CLI, app and IDE) under a top-level `"ledge"` key. Payloads have no event name, so the command is `ledge-hook antigravity:<Event>`. Project folder is `workspacePaths[0]`. Only `PreInvocation` and `Stop` are used, because `PreToolUse` output needs a `decision`. There is no waiting state.
-- Hook timeouts are in seconds for Claude Code and Antigravity.
+- Cursor: hooks live in `~/.cursor/hooks.json` as `{"version": 1, "hooks": {event: [entry]}}`, with entries directly in each event's list. Session id is `conversation_id`, project folder is `workspace_roots[0]`. Permission hooks (`preToolUse`, `beforeShellExecution`, …) block on empty output, so Ledge uses only `beforeSubmitPrompt`, `postToolUse` and `stop`. There is no waiting state. Confirmed working with the Cursor CLI (`agent`, 2026.10.22); the app reads the same file.
+- Hook timeouts are in seconds for Antigravity, Claude Code and Cursor.
 - Config files with comments fail to parse; Ledge then leaves them untouched.
 - Open at login is a login item (`MacosLauncher::AppleScript`). Release builds replace any old LaunchAgent on launch; dev builds skip this.
 - Keep `@tauri-apps/api`, `@tauri-apps/cli` and the Rust `tauri` crate on the same major.minor.

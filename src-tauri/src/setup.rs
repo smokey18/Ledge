@@ -1,4 +1,4 @@
-use crate::{antigravity, claude, codex};
+use crate::{antigravity, claude, codex, cursor};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -20,6 +20,7 @@ fn hooks_file(agent: &str) -> Option<(PathBuf, &'static [&'static str])> {
         )),
         "claude" => Some((home().join(".claude/settings.json"), claude::EVENTS)),
         "codex" => Some((home().join(".codex/hooks.json"), codex::EVENTS)),
+        "cursor" => Some((home().join(".cursor/hooks.json"), cursor::EVENTS)),
         _ => None,
     }
 }
@@ -128,12 +129,16 @@ fn is_ours(entry: &Value) -> bool {
         })
 }
 
+fn uses_flat_hooks(agent: &str) -> bool {
+    agent == "cursor"
+}
+
 fn add_hooks(root: &mut Value, events: &[&str], binary: &str, agent: &str) {
-    let hooks = root
-        .as_object_mut()
-        .expect("root is an object")
-        .entry("hooks")
-        .or_insert_with(|| json!({}));
+    let object = root.as_object_mut().expect("root is an object");
+    if uses_flat_hooks(agent) {
+        object.entry("version").or_insert_with(|| json!(1));
+    }
+    let hooks = object.entry("hooks").or_insert_with(|| json!({}));
 
     for event in events {
         let Some(groups) = hooks
@@ -146,7 +151,11 @@ fn add_hooks(root: &mut Value, events: &[&str], binary: &str, agent: &str) {
             continue;
         };
 
-        groups.push(json!({ "hooks": [entry(binary, agent)] }));
+        groups.push(if uses_flat_hooks(agent) {
+            entry(binary, agent)
+        } else {
+            json!({ "hooks": [entry(binary, agent)] })
+        });
     }
 }
 
@@ -165,6 +174,9 @@ fn drop_hooks(root: &mut Value) {
         };
         let was_empty = groups.is_empty();
         groups.retain_mut(|group| {
+            if is_ours(group) {
+                return false;
+            }
             let Some(entries) = group.get_mut("hooks").and_then(Value::as_array_mut) else {
                 return true;
             };
@@ -436,6 +448,28 @@ mod tests {
         assert!(link.is_symlink());
         assert_eq!(read_json(&path).unwrap(), json!({"model":"opus"}));
         std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[test]
+    fn flat_hooks_round_trip_and_leave_foreign_entries_alone() {
+        let original = json!({
+            "version": 1,
+            "hooks": { "stop": [{ "command": "./audit.sh" }] }
+        });
+
+        let mut document = original.clone();
+        add_hooks(&mut document, cursor::EVENTS, BINARY, "cursor");
+        let stop = document["hooks"]["stop"].as_array().unwrap();
+        assert_eq!(stop.len(), 2);
+        assert_eq!(stop[1]["command"], format!("'{BINARY}' cursor"));
+        assert_eq!(stop[1]["timeout"], 5);
+
+        drop_hooks(&mut document);
+        assert_eq!(document, original);
+
+        let mut fresh = json!({});
+        add_hooks(&mut fresh, &["stop"], BINARY, "cursor");
+        assert_eq!(fresh["version"], 1);
     }
 
     #[test]
