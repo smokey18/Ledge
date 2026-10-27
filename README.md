@@ -1,7 +1,12 @@
 # Ledge
 
 A small Mac widget that shows when Claude Code or Codex is working, waiting
-for you, or finished. It only sees sessions running on your own Mac.
+for you, or finished.
+
+It works with Claude Code in the terminal, your editor and the Claude desktop
+app's Code tab, and with Codex on your Mac. It can't see regular chats in
+Claude or ChatGPT, Claude Design, or Codex cloud tasks, because those run on
+the provider's servers rather than on your Mac.
 
 <p align="center">
   <img src="docs/readme/ledge-main.png" alt="Ledge with no active sessions" width="75%">
