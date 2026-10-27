@@ -66,9 +66,11 @@ Open Ledge before you start your agent, so it can see your sessions.
 
 Requires Rust and Node.js 20 or newer.
 
-To check a downloaded `.dmg` is genuine:
+If you downloaded the `.dmg` yourself, check it is genuine from the folder it
+is in:
 
 ```sh
+cd ~/Downloads
 gh attestation verify Ledge_*.dmg --repo smokey18/Ledge
 ```
 

@@ -31,7 +31,8 @@ url=$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" |
 
 echo "Downloading ${url##*/}"
 curl -fsSL -o "$tmp/ledge.dmg" "$url"
-hdiutil attach -nobrowse -readonly -mountpoint "$tmp/mnt" "$tmp/ledge.dmg" >/dev/null
+diskutil image attach --nobrowse --readOnly --mountPoint "$tmp/mnt" "$tmp/ledge.dmg" >/dev/null 2>&1 ||
+  hdiutil attach -nobrowse -readonly -mountpoint "$tmp/mnt" "$tmp/ledge.dmg" >/dev/null
 
 [ -d "$tmp/mnt/Ledge.app" ] || { echo "The download contains no Ledge.app" >&2; exit 1; }
 staging=$(mktemp -d /Applications/.ledge.XXXXXX)
